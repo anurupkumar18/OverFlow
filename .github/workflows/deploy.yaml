@@ -20,6 +20,8 @@ concurrency:
 
 jobs:
   build:
+    # Only in your copy: the template repo itself keeps its placeholders.
+    if: github.repository != 'skyhook-io/cnh-starter'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
