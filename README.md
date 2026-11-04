@@ -4,9 +4,23 @@ Start here if your team has a namespace on the hackathon cluster. You get a smal
 
 ## Before you start
 
-Get your team's namespace at the Radar table: bring a team name and everyone's email. Each of you gets an invite to the hackathon's organization in Radar Cloud. Accept it at [app.radarhq.io](https://app.radarhq.io), and Radar Cloud shows your namespace, `team-<team-name>`.
+Get your team's namespace at **join.cnh.radarhq.io** (the join code is on the Radar table and in the organizers' email), or at the Radar table. Within a minute you have:
 
-## Get it running
+- the namespace `team-<team-name>` on the hackathon cluster,
+- this starter app already running at `https://<team-name>.cnh.radarhq.io`,
+- an invite for each of you to the hackathon's organization in Radar Cloud. Accept it and sign in at [app.radarhq.io](https://app.radarhq.io).
+
+## Connect your agent
+
+In Radar Cloud, open **Agents** and pick your client. For Claude Code:
+
+```bash
+claude mcp add radar-cloud --transport http https://api.radarhq.io/mcp
+```
+
+It signs you in through your browser the first time. Ask it what's running in `team-<team-name>`.
+
+## Ship your own code
 
 1. **Make your copy.** Click **Use this template** > **Create a new repository**. Make it **public**, because Argo CD on the cluster reads it without credentials. Clone it.
 2. **Point it at your namespace.**
@@ -16,12 +30,7 @@ Get your team's namespace at the Radar table: bring a team name and everyone's e
    ```
    The GitHub Action builds the image and pushes it to GHCR.
 3. **Make the image public, once.** On your repo's GitHub page, open **Packages** (right-hand column) > **Package settings** > **Change visibility** > **Public**. GHCR makes new images private, and the cluster can't pull a private one.
-4. **Connect your agent to Radar Cloud.** In Radar Cloud, open **Agents** and pick your client. For Claude Code:
-   ```bash
-   claude mcp add radar-cloud --transport http https://api.radarhq.io/mcp
-   ```
-   It signs you in through your browser the first time.
-5. **Start GitOps.** Ask your agent to apply `argocd/application.yaml` through Radar's MCP server. From then on, Argo CD deploys every push to `main`. Your app is live at `https://<team-name>.cnh.radarhq.io`.
+4. **Start GitOps.** Ask your agent to apply `argocd/application.yaml` through Radar's MCP server. Argo CD takes over the starter app and from then on deploys every push to `main`.
 
 ## Make it production ready
 
