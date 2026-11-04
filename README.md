@@ -36,7 +36,7 @@ It signs you in through your browser the first time. Ask it what's running in `t
 
 - `examples/hpa`: autoscaling.
 - `examples/canary`: ship every change as an Argo Rollouts canary and promote it through Radar.
-- [`JUDGING.md`](JUDGING.md): every judging point, and where it shows in Radar.
+- [`JUDGING.md`](JUDGING.md): what the judges look for, with examples of showing what Radar did for your project.
 
 Replace `app/` with your own project whenever you like. Keep it listening on `$PORT` (8080) with `/healthz` and `/readyz`, or update the probes in `deploy/`.
 
