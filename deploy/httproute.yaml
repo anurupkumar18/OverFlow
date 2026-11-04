@@ -1,4 +1,4 @@
-# Your live URL: https://TEAM_NAME.cnh.radarhq.io. The hackathon cluster only
+# Your live URL: https://__TEAM__.cnh.radarhq.io. The hackathon cluster only
 # accepts this one hostname from your namespace.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -10,7 +10,7 @@ spec:
       namespace: gateway
       sectionName: https
   hostnames:
-    - TEAM_NAME.cnh.radarhq.io
+    - __TEAM__.cnh.radarhq.io
   rules:
     - backendRefs:
         - name: app

@@ -1,6 +1,6 @@
 # Notes for your coding agent
 
-This repo deploys to one namespace, `team-TEAM_NAME`, on the Cloud Native Hackathon's shared Kubernetes cluster. You operate it through Radar Cloud's MCP server (`radar-cloud`). There is no kubeconfig; Radar is the way into the cluster, and it acts as the signed-in person, so it can only see and change this team's namespace.
+This repo deploys to one namespace, `team-__TEAM__`, on the Cloud Native Hackathon's shared Kubernetes cluster. You operate it through Radar Cloud's MCP server (`radar-cloud`). There is no kubeconfig; Radar is the way into the cluster, and it acts as the signed-in person, so it can only see and change this team's namespace.
 
 ## How changes ship
 
@@ -29,5 +29,5 @@ Start with `issues` and `get_changes` for this namespace, read the evidence, and
 ## Limits
 
 - Quota for the namespace: 2 CPU and 4 GiB of requests, 4 CPU and 8 GiB of limits. Containers without their own requests and limits get small defaults.
-- Your public URL is `https://TEAM_NAME.cnh.radarhq.io`. The HTTPRoute can only claim that hostname.
+- Your public URL is `https://__TEAM__.cnh.radarhq.io`. The HTTPRoute can only claim that hostname.
 - Images come from GHCR and must be public.

@@ -46,7 +46,12 @@ Argo CD (Applications in your namespace, project `team-<team-name>`), Argo Rollo
 
 ## Bringing your own cluster instead
 
-Everything here works on any cluster with Argo CD and Argo Rollouts installed, apart from the HTTPRoute and the URL. Connect your cluster to your own free Radar Cloud organization: sign up at [app.radarhq.io/signup](https://app.radarhq.io/signup), click **Connect a cluster**, and run the Helm command it gives you.
+The same repo works on your own cluster (kind, k3d, minikube or a cloud cluster) with Argo CD installed, and Argo Rollouts if you use `examples/canary`:
+
+1. Connect the cluster to your own free Radar Cloud organization: sign up at [app.radarhq.io/signup](https://app.radarhq.io/signup), click **Connect a cluster**, and run the Helm command it gives you.
+2. Run `./scripts/setup.sh <team-name>`, then delete the `- httproute.yaml` line from `deploy/kustomization.yaml` (it points at the hackathon's gateway). Push.
+3. Apply `argocd/application-byo.yaml` instead of `argocd/application.yaml`: it uses Argo CD's `default` project and creates the namespace.
+4. Reach the app with Radar's port-forward, or `kubectl -n team-<team-name> port-forward svc/app 8080:80`.
 
 ## Help
 
