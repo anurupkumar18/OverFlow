@@ -20,12 +20,12 @@ if [[ ! "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
 fi
 repo_lower="$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')"
 
-files=$(grep -rl -e TEAM_NAME -e OWNER/REPO deploy argocd examples AGENTS.md || true)
+files=$(grep -rl -e __TEAM__ -e OWNER/REPO deploy argocd examples AGENTS.md || true)
 for f in $files; do
   # GHCR image names must be lowercase; the git URL keeps its case.
   sed -i.bak -e "s#ghcr.io/OWNER/REPO#ghcr.io/${repo_lower}#g" \
              -e "s#OWNER/REPO#${repo}#g" \
-             -e "s#TEAM_NAME#${team}#g" "$f"
+             -e "s#__TEAM__#${team}#g" "$f"
   rm -f "$f.bak"
 done
 
