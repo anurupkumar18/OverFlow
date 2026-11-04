@@ -10,6 +10,8 @@ Get your team's namespace at **join.cnh.radarhq.io** (the join code is on the Ra
 - this starter app already running at `https://<team-name>.cnh.radarhq.io`,
 - an invite for each of you to the hackathon's organization in Radar Cloud. Accept it and sign in at [app.radarhq.io](https://app.radarhq.io).
 
+Every team is in the same Radar Cloud organization. You see and change only your own namespace, but everyone in the org can see the member list (with emails) and any investigation you mark **Shared**. Investigations start private; keep them that way unless you mean to show every team.
+
 ## Connect your agent
 
 In Radar Cloud, open **Agents** and pick your client. For Claude Code:
@@ -18,7 +20,7 @@ In Radar Cloud, open **Agents** and pick your client. For Claude Code:
 claude mcp add radar-cloud --transport http https://api.radarhq.io/mcp
 ```
 
-It signs you in through your browser the first time. Ask it what's running in `team-<team-name>`.
+It signs you in through your browser the first time. If you're in more than one Radar Cloud organization, pick **Cloud Native Hackathon** under "Organization access" on that page. Ask it what's running in `team-<team-name>`.
 
 ## Ship your own code
 
