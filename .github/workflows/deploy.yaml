@@ -53,10 +53,19 @@ jobs:
           IMAGE: ${{ steps.meta.outputs.image }}
           TAG: ${{ steps.meta.outputs.tag }}
         run: |
-          yq -i '(.images[] | select(.name == "app")) |= (.newName = strenv(IMAGE) | .newTag = strenv(TAG))' deploy/kustomization.yaml
-          if git diff --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "deploy: ${TAG} [skip ci]"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          # Set the image on top of the latest main, not on the commit this run
+          # built. A push that landed during the build (yours, or the previous
+          # run's deploy commit) then can't conflict; retry if one lands mid-push.
+          for attempt in 1 2 3 4 5; do
+            git fetch -q origin main
+            git reset -q --hard FETCH_HEAD
+            yq -i '(.images[] | select(.name == "app")) |= (.newName = strenv(IMAGE) | .newTag = strenv(TAG))' deploy/kustomization.yaml
+            if git diff --quiet; then exit 0; fi
+            git commit -qam "deploy: ${TAG} [skip ci]"
+            if git push -q origin HEAD:main; then exit 0; fi
+            sleep $((attempt * 3))
+          done
+          echo "Couldn't push the deploy commit after 5 tries." >&2
+          exit 1

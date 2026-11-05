@@ -22,10 +22,17 @@ repo_lower="$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')"
 
 files=$(grep -rl -e __TEAM__ -e OWNER/REPO deploy argocd examples AGENTS.md || true)
 for f in $files; do
-  # GHCR image names must be lowercase; the git URL keeps its case.
-  sed -i.bak -e "s#ghcr.io/OWNER/REPO#ghcr.io/${repo_lower}#g" \
-             -e "s#OWNER/REPO#${repo}#g" \
-             -e "s#__TEAM__#${team}#g" "$f"
+  if [ "$f" = deploy/kustomization.yaml ]; then
+    # The image lines here belong to the GitHub Action, which sets them on every
+    # push. Leaving them alone keeps your `git pull --rebase` from conflicting
+    # with the deploy commit the Action makes when GitHub creates your repo.
+    sed -i.bak -e "s#__TEAM__#${team}#g" "$f"
+  else
+    # GHCR image names must be lowercase; the git URL keeps its case.
+    sed -i.bak -e "s#ghcr.io/OWNER/REPO#ghcr.io/${repo_lower}#g" \
+               -e "s#OWNER/REPO#${repo}#g" \
+               -e "s#__TEAM__#${team}#g" "$f"
+  fi
   rm -f "$f.bak"
 done
 
