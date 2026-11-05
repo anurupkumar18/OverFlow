@@ -10,7 +10,7 @@ Get your team's namespace at **join.cnh.radarhq.io** (the join code is on the Ra
 - this starter app already running at `https://<team-name>.cnh.radarhq.io`,
 - an invite for each of you to the hackathon's organization in Radar Cloud. Accept it and sign in at [app.radarhq.io](https://app.radarhq.io).
 
-Every team is in the same Radar Cloud organization. You see and change only your own namespace, but everyone in the org can see the member list (with emails) and any investigation you mark **Shared**. Investigations start private; keep them that way unless you mean to show every team.
+Every team is in the same Radar Cloud organization. Your cluster access (resources, logs, Issues, the timeline, your agent's MCP calls) covers only your own namespace. Two things are org-wide: the member list, with emails, and any investigation you mark **Shared**. Investigations start private; keep them that way unless you mean to show every team. Alert notifications are off for the event, because they would go to everyone.
 
 ## Connect your agent
 
@@ -20,7 +20,11 @@ In Radar Cloud, open **Agents** and pick your client. For Claude Code:
 claude mcp add radar-cloud --transport http https://api.radarhq.io/mcp
 ```
 
-It signs you in through your browser the first time. If you're in more than one Radar Cloud organization, pick **Cloud Native Hackathon** under "Organization access" on that page. Ask it what's running in `team-<team-name>`.
+It signs you in through your browser the first time. If you're in more than one Radar Cloud organization, pick **Cloud Native Hackathon** under "Organization access" on that page. Then give it a first prompt:
+
+> Read AGENTS.md, check that you can reach our namespace through Radar, and tell me what's running. Don't change anything yet.
+
+This repo also has skills for shipping, debugging and canaries in `.agents/skills/`. Claude Code and Codex pick them up on their own.
 
 ## Ship your own code
 
@@ -28,11 +32,14 @@ It signs you in through your browser the first time. If you're in more than one 
 2. **Point it at your namespace.**
    ```bash
    ./scripts/setup.sh <team-name>
-   git commit -am "Set up team <team-name>" && git push
+   git commit -am "Set up team <team-name>" && git pull --rebase && git push
    ```
-   The GitHub Action builds the image and pushes it to GHCR.
+   The `git pull` picks up a commit the Action may already have made when GitHub created your repo. The Action builds the image and pushes it to GHCR. Wait for it to go green (the repo's **Actions** tab).
 3. **Make the image public, once.** On your repo's GitHub page, open **Packages** (right-hand column) > **Package settings** > **Change visibility** > **Public**. GHCR makes new images private, and the cluster can't pull a private one.
 4. **Start GitOps.** Ask your agent to apply `argocd/application.yaml` through Radar's MCP server. Argo CD takes over the starter app and from then on deploys every push to `main`.
+5. **Check it's yours.** Open `https://<team-name>.cnh.radarhq.io`. It shows `version` and the first 7 characters of your latest commit.
+
+One person can do this while the others accept their invites.
 
 ## Optional extras
 

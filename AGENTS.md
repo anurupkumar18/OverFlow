@@ -1,33 +1,30 @@
 # Notes for your coding agent
 
-This repo deploys to one namespace, `team-__TEAM__`, on the Cloud Native Hackathon's shared Kubernetes cluster. You operate it through Radar Cloud's MCP server (`radar-cloud`). There is no kubeconfig; Radar is the way into the cluster, and it acts as the signed-in person, so it can only see and change this team's namespace.
+This repo deploys to one namespace, `team-__TEAM__`, on the Cloud Native Hackathon's shared Kubernetes cluster. Use Radar Cloud's MCP server (`radar-cloud`) for everything you observe or change on the cluster. There is no kubeconfig. Radar acts as the signed-in person, so it sees and changes only this namespace. Pass `namespace: team-__TEAM__` wherever a tool takes it. Read each tool's schema; don't invent parameters.
 
-## How changes ship
+Deploys are GitOps: change the repo, push to `main`, and Argo CD syncs the namespace. Don't apply or patch app manifests on the cluster. Argo CD's self-heal puts the repo's version back. The one exception is `argocd/application.yaml`, applied once to start the sync.
 
-- Deploys are GitOps. Change the files in `deploy/`, commit and push to `main`. The GitHub Action builds the image and commits the new tag; Argo CD syncs the namespace to the repo.
-- Don't apply app manifests straight to the cluster. Argo CD's self-heal puts the repo's version back. The one exception is `argocd/application.yaml`, which is applied once (`apply_resource`) to start the sync.
-- After a push, wait for the sync and the rollout instead of guessing: `manage_gitops` shows and syncs the Argo CD Application, and `wait_for` waits for a rollout to finish.
+## When to do what
 
-## Radar MCP tools worth knowing
+- **First cluster access in a session.** List the clusters and read this namespace's workloads. If the hackathon cluster isn't there, the person hasn't accepted the Radar Cloud invite, or picked a different organization when connecting. Ask them to pick **Cloud Native Hackathon** under "Organization access" (reconnect the MCP server). Don't go on until you can read the namespace.
+- **After every push.** Wait for the GitHub Action and its `deploy: <sha> [skip ci]` commit. Sync or inspect the Argo CD Application through Radar, wait for the rollout, then check three things before saying it's deployed: the synced revision, workload health, and the URL showing the new version. Procedure: the `ship` skill.
+- **A deploy or the app fails.** Read the evidence first: `issues`, `get_changes`, events, logs (`diagnose` bundles them). Name the cause, then fix it in git. Procedure: the `debug-failure` skill.
+- **A canary is paused.** That's a release decision, not a stuck wait. Stop waiting at the pause, check the canary pods and the URL, show the person what you saw, and promote or abort only when they say so, unless they already told you to. Procedure: the `canary-release` skill.
+- **Once, before the demo.** Review Radar's Checks for this namespace (`get_cluster_audit`). Fix a finding that applies to this team's workloads, or say why it doesn't apply. Don't try to fix cluster-wide findings.
+- **A real symptom you can't explain.** Suggest the person start an AI investigation in Radar Cloud: Investigate on the failing resource. It traces the failure to a cause with evidence and changes nothing. That's a separate hosted run; `diagnose` doesn't start it.
 
-| Task | Tool |
-| --- | --- |
-| What's broken right now | `issues` |
-| Inspect a resource, its events, its logs | `get_resource`, `get_events`, `get_workload_logs`, `get_pod_logs` |
-| What changed recently | `get_changes` |
-| Best-practice findings (Radar's Checks) | `get_cluster_audit` |
-| Sync or inspect the Argo CD Application | `manage_gitops` |
-| Promote or abort an Argo Rollouts canary | `manage_rollout` |
-| Restart or scale a workload | `manage_workload` |
-| Wait for a rollout or sync to finish | `wait_for` |
-| Find the root cause of a failure | `diagnose` |
+## Never
 
-## When something breaks
+- Break things on purpose, or generate load you can't bound.
+- Touch other teams' namespaces, or try to change quota, RBAC or cluster settings.
+- Poll forever. Each wait has a limit (`wait_for` waits up to 45 seconds per call). After about 5 minutes, report what's blocking instead of retrying.
 
-Start with `issues` and `get_changes` for this namespace, read the evidence, and fix it in git. For a deeper look, start an AI investigation in Radar Cloud (Investigate on the failing resource). It traces the failure to a root cause and shows the evidence for each finding; it doesn't change anything, so you apply the fix.
+## Skills
+
+`.agents/skills/` has the three procedures named above: `ship`, `debug-failure` and `canary-release`. Claude Code and Codex load them as skills. If your agent doesn't, read the matching `SKILL.md` before that task.
 
 ## Limits
 
-- Quota for the namespace: 2 CPU and 4 GiB of requests, 4 CPU and 8 GiB of limits. Containers without their own requests and limits get small defaults.
+- Quota for the namespace: 2 CPU and 4 GiB of requests, 4 CPU and 8 GiB of limits. The starter pod's 500m CPU limit means 8 pods at most. Containers without their own requests and limits get small defaults.
 - Your public URL is `https://__TEAM__.cnh.radarhq.io`. The HTTPRoute can only claim that hostname.
 - Images come from GHCR and must be public.
