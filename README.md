@@ -1,6 +1,6 @@
 # Radar AI SRE track starter: Cloud Native Hackathon
 
-Start here if your team has a namespace on the hackathon cluster. You get a small app that `git push` deploys through Argo CD, an autoscaler and a canary ready to turn on, and notes your coding agent reads so it ships through [Radar](https://radarhq.io)'s MCP server.
+Start here if your team has a namespace on the hackathon cluster. You get a small app that `git push` deploys through Argo CD, and notes your coding agent reads so it ships through [Radar](https://radarhq.io)'s MCP server. Autoscaling and canary examples are there if you want them.
 
 ## Before you start
 
@@ -48,9 +48,16 @@ Pick one if it fits your project. Neither is required.
 - `examples/hpa`: autoscaling.
 - `examples/canary`: ship every change as an Argo Rollouts canary and promote it through Radar.
 
-[`JUDGING.md`](JUDGING.md) says what the judges look for, with examples of showing what Radar did for your project.
-
 Replace `app/` with your own project whenever you like. Keep it listening on `$PORT` (8080) with `/healthz` and `/readyz`, or update the probes in `deploy/`.
+
+## What the judges look for
+
+1. Run your project on Kubernetes with Radar connected, in the namespace we provide your team or on your own cluster.
+2. Use Radar's UI and MCP throughout building and operating your project. Show how Radar helped you ship, troubleshoot, or improve your app.
+3. Use Radar's AI investigations to investigate a real issue or question about your running app. Show what you learned and what you did with the findings.
+4. Build something that makes conferences easier.
+
+One real decision Radar helped you make is enough. More features don't score higher, and don't break things on purpose for the demo. Official wording: [hackathon page](https://www.wemakedevs.org/hackathons/cnh).
 
 ## What's on the cluster
 
@@ -60,7 +67,7 @@ Argo CD (Applications in your namespace, project `team-<team-name>`), Argo Rollo
 
 The same repo works on your own cluster (kind, k3d, minikube or a cloud cluster) with Argo CD installed, and Argo Rollouts if you use `examples/canary`:
 
-1. Connect the cluster to your own free Radar Cloud organization: sign up at [app.radarhq.io/signup](https://app.radarhq.io/signup), click **Connect a cluster**, and run the Helm command it gives you.
+1. Connect the cluster to your own free Radar Cloud organization: sign up at [app.radarhq.io](https://app.radarhq.io), click **Connect a cluster**, and run the Helm command it gives you.
 2. Run `./scripts/setup.sh <team-name>`, then delete the `- httproute.yaml` line from `deploy/kustomization.yaml` (it points at the hackathon's gateway). Push.
 3. Apply `argocd/application-byo.yaml` instead of `argocd/application.yaml`: it uses Argo CD's `default` project and creates the namespace.
 4. Reach the app with Radar's port-forward, or `kubectl -n team-<team-name> port-forward svc/app 8080:80`.
