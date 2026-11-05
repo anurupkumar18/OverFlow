@@ -34,11 +34,14 @@ It signs you in through your browser the first time. If you're in more than one 
 3. **Make the image public, once.** On your repo's GitHub page, open **Packages** (right-hand column) > **Package settings** > **Change visibility** > **Public**. GHCR makes new images private, and the cluster can't pull a private one.
 4. **Start GitOps.** Ask your agent to apply `argocd/application.yaml` through Radar's MCP server. Argo CD takes over the starter app and from then on deploys every push to `main`.
 
-## Make it production ready
+## Optional extras
+
+Pick one if it fits your project. Neither is required.
 
 - `examples/hpa`: autoscaling.
 - `examples/canary`: ship every change as an Argo Rollouts canary and promote it through Radar.
-- [`JUDGING.md`](JUDGING.md): what the judges look for, with examples of showing what Radar did for your project.
+
+[`JUDGING.md`](JUDGING.md) says what the judges look for, with examples of showing what Radar did for your project.
 
 Replace `app/` with your own project whenever you like. Keep it listening on `$PORT` (8080) with `/healthz` and `/readyz`, or update the probes in `deploy/`.
 

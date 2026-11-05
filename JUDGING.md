@@ -11,4 +11,6 @@ The official wording is on the [hackathon page](https://www.wemakedevs.org/hacka
 3. **Radar is part of how you built and ran it**, not one call at the end. A stretch of your agent's session working through Radar's MCP shows this well.
 4. **How well your project makes conferences easier.**
 
-Don't break things on purpose for the demo. Something real will go wrong during the day, and that's the best thing to show.
+Show one meaningful decision Radar helped your team make: a verified healthy release, a Check you fixed, a rollout you promoted or aborted, or the cause of a real problem. Explain the evidence and what you did. More features or tool calls don't score higher.
+
+Don't break things on purpose for the demo.

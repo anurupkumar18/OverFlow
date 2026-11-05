@@ -10,7 +10,9 @@ spec:
     kind: Deployment
     name: app
   minReplicas: 2
-  maxReplicas: 8
+  # 4 pods at the starter's 500m CPU limit is 2 of the namespace's 4 CPU of
+  # limits, which leaves room for a rollout's extra pod and your other workloads.
+  maxReplicas: 4
   metrics:
     - type: Resource
       resource:

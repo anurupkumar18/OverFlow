@@ -1,6 +1,6 @@
 # Canary releases with Argo Rollouts
 
-Argo Rollouts is installed on the hackathon cluster. To ship every change as a canary:
+Optional. Use it if a staged release fits your project; a plain Deployment is fine otherwise. Argo Rollouts is installed on the hackathon cluster. To ship every change as a canary:
 
 1. Copy `rollout.yaml` into `deploy/`. In `deploy/kustomization.yaml`, replace `deployment.yaml` with `rollout.yaml` under `resources:`.
 2. If you use the HPA, change its `scaleTargetRef` to `apiVersion: argoproj.io/v1alpha1` and `kind: Rollout`, and delete `replicas:` from the Rollout.
