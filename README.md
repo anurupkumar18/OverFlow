@@ -4,7 +4,7 @@ Start here if your team has its own cluster at the hackathon: a virtual Kubernet
 
 ## Before you start
 
-Get your team's cluster at **join.cnh.radarhq.io** (the join code is on the Radar table and in the organizers' email), or at the Radar table. It takes 3 to 4 minutes; `join.cnh.radarhq.io/status/<team-name>` shows the progress and says when it's ready. Then you have:
+Get your team's cluster at **join.cnh.radarhq.io** (the join code is shared at the kickoff and on the Radar table). It takes 3 to 4 minutes; `join.cnh.radarhq.io/status/<team-name>` shows the progress and says when it's ready. Then you have:
 
 - your own cluster, named `<team-name>` in Radar Cloud,
 - this starter app already running in it, in namespace `team-<team-name>`, at `https://<team-name>.cnh.radarhq.io`,
