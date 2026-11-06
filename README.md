@@ -64,7 +64,7 @@ Pick what your project needs. None of it is required, and more doesn't score hig
 | Trace a failure to its cause | **Investigate** on the failing resource | You start this one in Radar Cloud. |
 | Check health and security | Checks | "Review Checks for our namespace and fix what applies." |
 | See load and resource use over time | The workload's Metrics tab | "Is our memory climbing? Are our requests sized right?" |
-| Add a database or an operator | Helm | "Install CloudNativePG and a small Postgres for us." |
+| Add a database | Helm, Resources | "Create a small Postgres for us" (`examples/postgres`). |
 | Restart, scale or run a job | The workload's page | "Restart the app." "Run the cronjob now." |
 | Release carefully, or autoscale | The Rollout's page: Promote, Abort | "Switch us to canary releases" (`examples/canary`), or "Add autoscaling" (`examples/hpa`). |
 
