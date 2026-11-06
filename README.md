@@ -2,6 +2,13 @@
 
 Start here if your team has its own cluster at the hackathon: a virtual Kubernetes cluster (vcluster) where you're cluster-admin. You get a small app that `git push` deploys through Argo CD, and notes your coding agent reads so it ships through [Radar](https://radarhq.io)'s MCP server. Autoscaling and canary examples are there if you want them.
 
+## The day
+
+- 11:00: get your cluster and connect your agent (steps below).
+- All day: Argo CD deploys every push, and your agent pushes, syncs and waits for each rollout through Radar.
+- By 5:30: tell the day's story from Radar: the timeline, the investigation, and Checks before and after.
+- The winning team gets $4,000. Hackathon clusters and access to the hackathon org end on Friday, November 13.
+
 ## Before you start
 
 Get your team's cluster at **join.cnh.radarhq.io** (the join code is shared at the kickoff and on the Radar table). It takes 3 to 4 minutes; `join.cnh.radarhq.io/status/<team-name>` shows the progress and says when it's ready. Then you have:
@@ -116,6 +123,10 @@ The same repo works on a cluster you bring (kind, k3d, minikube or a cloud clust
 3. Apply `argocd/application-byo.yaml` instead of `argocd/application.yaml`: it uses Argo CD's `default` project and creates the namespace.
 4. Reach the app with Radar's port-forward, or `kubectl -n team-<team-name> port-forward svc/app 8080:80`.
 
+## After today
+
+Connect your own cluster to Radar Cloud. Hackathon participants get 3 months of Enterprise free: tell us your org name at the Radar table or in reply to our follow-up email, by Nov 30. Or run open-source Radar (`brew install kubectl-radar`), and star [skyhook-io/radar](https://github.com/skyhook-io/radar) if it helped.
+
 ## Help
 
-Find Roy, Nadav or Arlen at the Radar table, or ask in the [Radar Discord](https://radarhq.io/community/chat).
+Find Roy, Nadav or Arlen at the Radar table, or ask in `#cnh-hackathon` on the [Radar Discord](https://radarhq.io/community/chat).
