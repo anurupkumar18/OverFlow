@@ -1,11 +1,13 @@
 ---
 name: canary-release
-description: Ship a change as an Argo Rollouts canary on the hackathon cluster, check it, then promote or abort it through Radar. Use when asked for a canary, progressive delivery, a safe or gradual release, to promote or abort a rollout, or to switch the app from a Deployment to a Rollout.
+description: Ship a change as an Argo Rollouts canary in this team's cluster at the hackathon, check it, then promote or abort it through Radar. Use when asked for a canary, progressive delivery, a safe or gradual release, to promote or abort a rollout, or to switch the app from a Deployment to a Rollout.
 ---
 
 # Canary release: ship, check, promote or abort
 
-The namespace is `team-<team>`, from `namespace:` in `deploy/kustomization.yaml`, and the URL is `https://<team>.cnh.radarhq.io`. Pass `namespace` to every Radar MCP call.
+The namespace is `team-<team>`, from `namespace:` in `deploy/kustomization.yaml`, and the URL is `https://<team>.cnh.radarhq.io`. The Argo Rollouts controller is already installed in the team's cluster.
+
+**Pass `cluster` and `namespace` to every Radar MCP call.** `cluster` is the `id` of the `list_clusters` entry whose `name` is exactly `<team>`. The organization has about 40 team clusters plus `cnh`; never use another one.
 
 The canary steps are in `deploy/rollout.yaml`:
 1. 25% of the pods get the new version;
@@ -14,7 +16,7 @@ The canary steps are in `deploy/rollout.yaml`:
 4. a 60-second pause;
 5. 100%.
 
-The split is by pod count (1 in 4 pods), not by request weight.
+The split is by pod count (1 in 4 pods), not by request weight: the URL goes straight to Service `app`, with no traffic router for Argo Rollouts to drive.
 
 ## 0. Turn it on (once)
 

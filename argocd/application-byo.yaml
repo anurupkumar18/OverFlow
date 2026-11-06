@@ -1,4 +1,4 @@
-# Only for bringing your own cluster (not the hackathon cluster): an Argo CD
+# Only for a cluster you bring (not the one the hackathon gives you): an Argo CD
 # Application in the argocd namespace using the default project, deploying
 # deploy/ into team-__TEAM__ (created if missing). Your cluster needs Argo CD
 # (and Argo Rollouts for examples/canary). Remove httproute.yaml from
