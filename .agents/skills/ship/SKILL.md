@@ -17,7 +17,7 @@ Skip this if `get_resource` (kind `Application`, group `argoproj.io`, name `app`
 
 1. If `deploy/kustomization.yaml` still says `team-__TEAM__`, run `./scripts/setup.sh <team>` first. Ask for the team name if you don't know it.
 2. Push (step 1 below) and wait for the first build (step 2).
-3. The person must make the GHCR image public once: repo page > Packages > Package settings > Change visibility > Public. You can't do this for them. Ask, and wait until they confirm.
+3. The GHCR image must be public, and usually already is. Ask the person to check that the package on their repo page (Packages, right-hand column) says Public. If it says Private, they change it: Package settings > Change visibility > Public. You can't do this for them; wait until they confirm.
 4. Apply `argocd/application.yaml` with `apply_resource` (with `cluster`). This is the only app manifest you apply straight to the cluster. The starter app is already running; Argo CD takes it over.
 
 ## 1. Push

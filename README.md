@@ -1,12 +1,13 @@
 # Radar AI SRE track starter: Cloud Native Hackathon
 
-Start here if your team has its own cluster at the hackathon: a virtual Kubernetes cluster (vcluster) where you're cluster-admin. You get a small app that `git push` deploys through Argo CD, and notes your coding agent reads so it ships through [Radar](https://radarhq.io)'s MCP server. Autoscaling and canary examples are there if you want them.
+Start here if your team has its own cluster at the hackathon: a virtual Kubernetes cluster (vcluster) where you're cluster-admin. You get a small app that `git push` deploys through Argo CD, and notes your coding agent reads so it ships through [Radar](https://radarhq.io)'s MCP server. Below is a menu of what Radar can do: pick what your project needs.
 
 ## The day
 
-- 11:00: get your cluster and connect your agent (steps below).
-- All day: Argo CD deploys every push, and your agent pushes, syncs and waits for each rollout through Radar.
-- By 5:30: tell the day's story from Radar: the timeline, the investigation, and Checks before and after.
+- 11:00: before you write any code, get your cluster, open it in Radar Cloud, and connect your agent to Radar (steps below).
+- First hour: open **Checks** for your cluster and take a screenshot. That's your "before".
+- All day, work through Radar: your agent pushes, syncs and waits for each rollout through Radar's MCP. When something breaks, look in Radar first, and start an AI investigation on anything you can't explain.
+- By 5:30: tell the day's story from Radar: the timeline, the investigation, and Checks before and after. It's only there if you used Radar all day.
 - The winning team gets $4,000. Hackathon clusters and access to the hackathon org end on Friday, November 13.
 
 ## Before you start
@@ -44,18 +45,28 @@ This repo also has skills for shipping, debugging and canaries in `.agents/skill
    git commit -am "Set up team <team-name>" && git pull --rebase && git push
    ```
    The `git pull` picks up a commit the Action may already have made when GitHub created your repo. The Action builds the image and pushes it to GHCR. Wait for it to go green (the repo's **Actions** tab).
-3. **Make the image public, once.** On your repo's GitHub page, open **Packages** (right-hand column) > **Package settings** > **Change visibility** > **Public**. GHCR makes new images private, and your cluster can't pull a private one.
+3. **Check the image is public.** On your repo's GitHub page, open **Packages** (right-hand column) and your image: it should say **Public**, and usually already does. If it says **Private**, open **Package settings** > **Change visibility** > **Public**, because your cluster can't pull a private image.
 4. **Start GitOps.** Ask your agent to apply `argocd/application.yaml` to your cluster through Radar's MCP server. Argo CD takes over the starter app and from then on deploys every push to `main`.
 5. **Check it's yours.** Open `https://<team-name>.cnh.radarhq.io`. It shows `version` and the first 7 characters of your latest commit.
 
 One person can do this while the others accept their invites.
 
-## Optional extras
+## What Radar can do for you
 
-Pick one if it fits your project. Neither is required.
+Pick what your project needs. None of it is required, and more doesn't score higher.
 
-- `examples/hpa`: autoscaling.
-- `examples/canary`: ship every change as an Argo Rollouts canary and promote it through Radar.
+| You want to | In Radar Cloud | Or ask your agent |
+|---|---|---|
+| See what's running and how it connects | Topology, Resources | "Show me what our app talks to and depends on." |
+| Ship every push and know it worked | GitOps, the Application's page | "Ship this, and tell me when it's healthy and live." |
+| Find what's broken right now | Issues, the workload's Timeline and Logs | "What's unhealthy in our cluster, and why?" |
+| See what changed | Timeline, with diffs | "What changed in the last hour?" |
+| Trace a failure to its cause | **Investigate** on the failing resource | You start this one in Radar Cloud. |
+| Check health and security | Checks | "Review Checks for our namespace and fix what applies." |
+| See load and resource use over time | The workload's Metrics tab | "Is our memory climbing? Are our requests sized right?" |
+| Add a database or an operator | Helm | "Install CloudNativePG and a small Postgres for us." |
+| Restart, scale or run a job | The workload's page | "Restart the app." "Run the cronjob now." |
+| Release carefully, or autoscale | The Rollout's page: Promote, Abort | "Switch us to canary releases" (`examples/canary`), or "Add autoscaling" (`examples/hpa`). |
 
 Replace `app/` with your own project whenever you like. Keep it listening on `$PORT` (8080) with `/healthz` and `/readyz`, or update the probes in `deploy/`.
 

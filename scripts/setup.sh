@@ -43,9 +43,9 @@ Next:
   1. git commit -am "Set up team ${team}" && git pull --rebase && git push
      The GitHub Action builds your image and pushes it to ghcr.io/${repo_lower}.
      Wait for it to go green (the repo's Actions tab).
-  2. Once the first build finishes, make the image public: on your repo's GitHub page, open
-     Packages (right-hand column) > Package settings > Change visibility > Public.
-     GHCR makes new images private, and the cluster can't pull a private one.
+  2. Once the first build finishes, check the image is public: on your repo's GitHub page, open
+     Packages (right-hand column) and your image. It usually already says Public. If it says
+     Private, open Package settings > Change visibility > Public: the cluster can't pull a private one.
   3. Create the Argo CD Application in argocd/application.yaml. Ask your agent to apply it
      through Radar's MCP server, or apply it from Radar Cloud.
   4. Open https://${team}.cnh.radarhq.io: it shows your commit's version.
