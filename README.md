@@ -81,17 +81,33 @@ One real decision Radar helped you make is enough. More features don't score hig
 
 ## Your cluster
 
-Already installed: Argo CD in namespace `argocd`, Argo Rollouts, the Gateway API CRDs, metrics for `kubectl top` and the HPA, and Prometheus in namespace `monitoring`. Argo CD has no web UI here: see and sync your Applications in Radar Cloud, or through your agent. It picks up Applications in `team-*` namespaces, and your Argo CD project is `team-<team-name>`.
+Already installed: Argo CD in namespace `argocd`, Argo Rollouts, the Gateway API CRDs, metrics for `kubectl top` and the HPA, Prometheus in namespace `monitoring`, and the CloudNativePG operator in `cnpg-system`. Argo CD has no web UI here: see and sync your Applications in Radar Cloud, or through your agent. It picks up Applications in `team-*` namespaces, and your Argo CD project is `team-<team-name>`.
 
 **Metrics history.** Prometheus (`monitoring/prometheus-server`) scrapes your pods' CPU, memory and network, the kubelet, kube-state-metrics, and any pod or Service annotated `prometheus.io/scrape: "true"` (plus `prometheus.io/port` and `prometheus.io/path` if it isn't `/metrics`), every 30 seconds, and keeps 7 days. Radar finds it on its own: workloads get metric charts in Radar Cloud, and your agent can call `discover_metrics` to see what's there and `query_prometheus` to run PromQL. It doesn't count against your budget. It sees only your cluster. There's no node-exporter (the host refuses it) and no Alertmanager.
 
+**Postgres.** The CloudNativePG operator is already running, so a database is one `Cluster`. Keep it in git next to your app so Argo CD applies it, or have your agent apply it with Radar's `apply_resource`:
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: db
+  namespace: team-<team-name>
+spec:
+  instances: 1
+  storage:
+    size: 1Gi
+```
+
+It's ready in about a minute. Your app connects to `db-rw:5432`; the user, password and a full `uri` are in Secret `db-app`. Each instance is a pod and a PVC from your budget. `examples/postgres` has a version with requests and limits set, and the steps to wire it into your app.
+
 **Your URL.** The platform routes `https://<team-name>.cnh.radarhq.io` to Service `app`, port 80, in namespace `team-<team-name>`. Keep a Service by that name and port there, whatever runs behind it. You can't get other hostnames, and Services of type LoadBalancer or NodePort aren't available. The HTTPRoute in `deploy/` does nothing inside your cluster (there's no Gateway in it), and Argo CD counts it healthy, so leave it.
 
-**Install what you need.** You're cluster-admin, so CRDs, operators, Helm charts and more namespaces are all fine. For example, with [kubectl access](#kubectl), the CloudNativePG operator for Postgres:
+**Install what you need.** You're cluster-admin, so CRDs, operators, Helm charts and more namespaces are all fine. For example, with [kubectl access](#kubectl), NATS for messaging:
 
 ```bash
-helm repo add cnpg https://cloudnative-pg.github.io/charts
-helm upgrade --install cnpg cnpg/cloudnative-pg --namespace cnpg-system --create-namespace
+helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+helm upgrade --install nats nats/nats --namespace nats --create-namespace
 ```
 
 Or ask your agent to apply an operator's manifest with Radar's `apply_resource`, or to keep it in git as another Argo CD Application in `team-<team-name>`: your project `team-<team-name>` takes any source repo, any namespace in your cluster, and cluster-scoped resources.
