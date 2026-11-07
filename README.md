@@ -51,6 +51,28 @@ This repo also has skills for shipping, debugging and canaries in `.agents/skill
 
 One person can do this while the others accept their invites.
 
+## API keys and other secrets
+
+Your repo and your image are public, so an API key for a hosted AI model, or any other secret, must never be in either. Keep it in a Kubernetes Secret in your cluster, and give it to your app as an environment variable:
+
+1. **Create the Secret.** In Radar Cloud, open your cluster, then **Resources** > **Secrets** (under Configuration), and click **+** (Create Secret). In the YAML it shows, set `name: app-credentials` and `namespace: team-<team-name>`, replace `key: value` under `stringData` with `api-key: <your key>`, and click **Apply**. Or, with [kubectl](#kubectl):
+   ```bash
+   read -rs API_KEY   # paste the key, then press Enter
+   kubectl -n team-<team-name> create secret generic app-credentials --from-literal=api-key="$API_KEY"
+   ```
+   Create it yourself rather than giving the key to your agent: whatever you paste into a chat stays in its history.
+2. **Read it in your app.** Add this to the `env:` list of the container in `deploy/deployment.yaml`, then push. Only the Secret's name goes in git, never the key:
+   ```yaml
+   - name: API_KEY
+     valueFrom:
+       secretKeyRef:
+         name: app-credentials
+         key: api-key
+   ```
+   If you change the key later, restart the app so it reads the new value.
+
+Argo CD leaves this Secret alone, even with `prune: true`: it only prunes what it deployed from git. Never put a key in the code, the Dockerfile, a build argument or a commit, and don't log it. If one does reach GitHub or your image, revoke it with the provider and make a new one. Your agent's recipe for this, plus one-off Jobs, dependencies and checking the running app, is in [`examples/agent-workflows`](examples/agent-workflows/README.md).
+
 ## What Radar can do for you
 
 Pick what your project needs. None of it is required, and more doesn't score higher.
