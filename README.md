@@ -20,7 +20,7 @@ Get your team's cluster at **join.cnh.radarhq.io** (the join code is shared at t
 
 **Joining a team that already started?** Don't fill in the join form or copy the template again: ask your team for the repo, and ask us at the Radar table to add your email.
 
-Every team is in the same Radar Cloud organization, so Radar Cloud lists every team's cluster, each under its team's name, plus `cnh`, the platform's own cluster. You only have access to your own team's cluster. The member list (with emails), the Alerts page and the bell (each alert's resource, namespace and status), and any investigation you mark **Shared** are visible to every team. Investigations start private: only the person who started one can open it. So that person shows it at 5:30, or shares it on purpose, and then every team can read it. Alert notifications are off for the event, because they would go to everyone.
+Every team is in the same Radar Cloud organization, so Radar Cloud lists every team's cluster, each under its team's name, plus a cluster named `cnh`, the platform's own cluster. You only have access to your own team's cluster. The member list (with emails), the Alerts page and the bell (each alert's resource, namespace and status), and any investigation you mark **Shared** are visible to every team. Investigations start private: only the person who started one can open it. So that person shows it at 5:30, or shares it on purpose, and then every team can read it. Alert notifications are off for the event, because they would go to everyone.
 
 ## Connect your agent
 
