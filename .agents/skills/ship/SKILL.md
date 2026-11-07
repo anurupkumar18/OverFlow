@@ -17,13 +17,7 @@ Skip this if `get_resource` (kind `Application`, group `argoproj.io`, name `app`
 
 1. If `deploy/kustomization.yaml` still says `team-__TEAM__`, run `./scripts/setup.sh <team>` first. Ask for the team name if you don't know it.
 2. Push (step 1 below) and wait for the first build (step 2).
-3. The GHCR image must be public, and usually already is. Check it without credentials, with `newName` (minus `ghcr.io/`) and `newTag` from `deploy/kustomization.yaml`:
-   ```bash
-   repo=<owner>/<repo>; tag=<tag>
-   token=$(curl -s "https://ghcr.io/token?scope=repository:$repo:pull" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
-   curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $token" -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json' "https://ghcr.io/v2/$repo/manifests/$tag"
-   ```
-   `200` is public: go on. `401` or `403` is private: ask the person to open the package on their repo page (Packages, right-hand column) > Package settings > Change visibility > Public. You can't do this for them; wait until they confirm, then check again. `404` means that tag wasn't built: see step 2.
+3. The GHCR image must be public, and usually already is. Don't check it up front: new pods that pull it and run (step 4) prove it.
 4. Apply `argocd/application.yaml` with `apply_resource` (with `cluster`). The starter app is already running; Argo CD takes it over. Keep the app’s reconciled manifests in GitOps. Direct Secrets and temporary Jobs follow the [agent workflows](../../../examples/agent-workflows/README.md) recipe.
 
 ## 1. Push
@@ -54,7 +48,15 @@ Then `get_resource` on the Application and check both of these:
 
 First read the live Deployment or Rollout with `get_resource` and confirm its app container image matches the expected image/tag from the remote `deploy/kustomization.yaml`. A healthy old workload does not prove this push deployed.
 
-Call `wait_for` with `kind: deployment` (or `rollout` if `deploy/` uses `rollout.yaml`) and `name: app`. Each call waits at most 45 seconds, so repeat it until it reports done, for up to about 5 minutes.
+Call `wait_for` with `kind: deployment` (or `rollout` if `deploy/` uses `rollout.yaml`) and `name: app`. Each call waits at most 45 seconds, so repeat it until it reports done, for up to about 5 minutes. New pods running the new image also prove the image is public.
+
+If the new pods show `ImagePullBackOff` or `ErrImagePull`, check the image without credentials, with `newName` (minus `ghcr.io/`) and `newTag` from `deploy/kustomization.yaml`:
+```bash
+repo=<owner>/<repo>; tag=<tag>
+token=$(curl -s "https://ghcr.io/token?scope=repository:$repo:pull" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $token" -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json' "https://ghcr.io/v2/$repo/manifests/$tag"
+```
+`401` or `403` means it's private: ask the person to open the package on their repo page (Packages, right-hand column) > Package settings > Change visibility > Public. You can't do this for them. Wait until they confirm; the pods retry on their own within a few minutes. `404` means that tag wasn't built: see step 2.
 
 A Rollout pauses at 25% on purpose. For that flow, use the `canary-release` skill.
 
