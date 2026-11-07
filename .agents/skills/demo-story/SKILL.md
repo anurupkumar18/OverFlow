@@ -21,7 +21,7 @@ The team is `<team>` from `namespace: team-<team>` in `deploy/kustomization.yaml
 5. **Screenshots to take,** each with its link (`https://app.radarhq.io/c/<cluster-id>/…`):
    - `timeline`: the day's changes;
    - the Application `app`: `resources/applications?resource=team-<team>/app&apiGroup=argoproj.io`;
-   - `checks`: the whole list (the platform's findings show what Radar catches), and with Namespace set to `team-<team>` next to the morning's;
+   - Checks: the whole list (`https://app.radarhq.io/checks?scope=<cluster-id>`, the platform's findings show what Radar catches), and the team's (`https://app.radarhq.io/checks?scope=<cluster-id>&namespace=team-<team>`) next to the morning's;
    - the investigation (step 3).
 
 Show them the story and the list, and ask before you commit `STORY.md`.
