@@ -46,16 +46,15 @@ Deploys are GitOps: change the repo, push to `main`, and Argo CD syncs the names
 
 ## What every team sees
 
-Every team's cluster shows these. None is the team's to fix, or worth the team's AI investigation:
+Every team's cluster shows these. None is the team's to fix. Don't spend an AI investigation on the CoreDNS issue or the start-up warnings:
 
 - Issue "CoreDNS service DNS rewrite" on `kube-system/coredns`: the vcluster's own DNS setup.
 - About 5 Warning events (probes, `FailedMount` of `kube-root-ca.crt`) from the cluster's first minute.
 - "9 of 10 Deployments available": `argocd-applicationset-controller` is scaled to 0 on purpose.
 - Node CPU and memory gauges: the shared host nodes, not the team's budget.
 - "Can upgrade Radar" on every cluster card: don't. Radar 1.19 is on purpose (1.20 flags the starter's HTTPRoute, whose Gateway is on the host).
+- Checks across all namespaces include findings on the pre-installed platform ("managed by Helm but not GitOps" and more). They're real Radar findings, fine to look at and show, but not the team's to fix. For the team's fixes and its before/after, use `team-__TEAM__` plus namespaces you added. Secret `default/kubeconfig` shows as unused: it's the person's kubectl access, keep it.
 - The bell and Alerts: every team's alerts, not just this one's.
-
-**Checks on the pre-installed platform** (Argo CD, Argo Rollouts, Prometheus, CloudNativePG, Radar), such as "managed by Helm but not GitOps", are real Radar findings, and worth a look: they show what Radar catches. They're not the team's to fix (see Never), so scope your own fixes, and the before and after, to `team-__TEAM__` plus namespaces you added. Checks also lists Secret `default/kubeconfig` as unused: it's the person's kubectl access, keep it.
 
 ## Application workflows
 
