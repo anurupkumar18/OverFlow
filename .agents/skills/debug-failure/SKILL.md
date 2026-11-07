@@ -50,7 +50,7 @@ Make the smallest change that removes the cause. For repo changes, push and foll
 
 ## 5. When it's not obvious
 
-Suggest a hosted AI investigation. Hosted investigations cost the team nothing at the hackathon: they come from the organization's allowance. Once the person has asked for one, use the hosted tools if the organization-level `/mcp` connection advertises `start_investigation`; follow `examples/agent-workflows/README.md`. Otherwise the person can open the resource at app.radarhq.io and click Investigate. The investigation tools do not apply remediation. Verify findings against primary evidence and apply fixes through the resource’s owner. New interactive runs, including MCP starts, are private unless the person shares them; sharing shows them to every team in the org.
+Suggest a hosted AI investigation. Hosted investigations cost the team nothing at the hackathon: they come from the organization's allowance. Once the person has asked for one, use the hosted tools if the organization-level `/mcp` connection advertises `start_investigation`; follow `examples/agent-workflows/README.md`. Otherwise give the person the failing resource's Radar Cloud link (format in AGENTS.md, "A real symptom you can't explain"): the sparkle button at the top right starts the investigation. The investigation tools do not apply remediation. Verify findings against primary evidence and apply fixes through the resource’s owner. New interactive runs, including MCP starts, are private unless the person shares them; sharing shows them to every team in the org.
 
 ## Report
 

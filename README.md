@@ -7,7 +7,7 @@ Start here if your team has its own cluster at the hackathon: a virtual Kubernet
 - 11:00: before you write any code, get your cluster, open it in Radar Cloud, and connect your agent to Radar (steps below).
 - First hour: open **Checks** for your cluster and take a screenshot. That's your "before".
 - All day, work through Radar: your agent pushes, syncs and waits for each rollout through Radar's MCP. When something breaks, look in Radar first, and start an AI investigation on anything you can't explain. Run at least one investigation today (the judges look for it). Nothing broke? Investigate your app after a release: it ends with an all-clear and the evidence, which counts.
-- By 5:30: tell the day's story from Radar: the timeline, the investigation, and Checks before and after. It's only there if you used Radar all day.
+- By 5:30: tell the day's story from Radar: the timeline, the investigation, and Checks before and after. It's only there if you used Radar all day. Your agent can draft it: ask it for your 5:30 story.
 - The winning team gets $4,000. Hackathon clusters and access to the hackathon org end on Friday, November 13.
 
 ## Before you start
@@ -24,19 +24,21 @@ Every team is in the same Radar Cloud organization, so Radar Cloud lists every t
 
 ## Connect your agent
 
-In Radar Cloud, open **Agents** and pick your client. For Claude Code:
+For Claude Code, run this once, from any folder:
 
 ```bash
-claude mcp add radar-cloud --transport http https://api.radarhq.io/mcp
+claude mcp add --scope user radar-cloud --transport http https://api.radarhq.io/mcp
 ```
 
-It signs you in through your browser the first time. If you're in more than one Radar Cloud organization, pick **Cloud Native Hackathon** under "Organization access" on that page. Then give it a first prompt:
+Then, in Claude Code, run `/mcp`, pick **radar-cloud** and **Authenticate**: it opens your browser. Under "Organization access", pick **Cloud Native Hackathon**. Another agent? In Radar Cloud, open **Agents** and pick yours.
 
-> Find our team's cluster in Radar (it's named <team-name>) and tell me what's running in team-<team-name>. Don't change anything yet.
+Start your agent in your copy of this repo (below) and give it a first prompt:
 
-Every Radar MCP tool takes a `cluster` id, and your agent must pass yours on every call: the organization has about 40 clusters. Once you have your repo (below), run your agent in it: AGENTS.md tells it how to find the id and how to ship.
+> Get me set up for the hackathon. Our team is <team-name>.
 
-This repo also has skills for shipping, debugging and canaries in `.agents/skills/`. Claude Code and Codex pick them up on their own.
+Every Radar MCP tool takes a `cluster` id, and your agent must pass yours on every call: the organization has about 40 clusters. AGENTS.md tells it how to find the id and how to ship.
+
+This repo also has skills for getting set up, shipping, debugging, canaries and the 5:30 story in `.agents/skills/`. Claude Code and Codex pick them up on their own.
 
 ## Ship your own code
 
@@ -109,7 +111,7 @@ One real decision Radar helped you make is enough. More features don't score hig
 
 ## Your cluster
 
-Already installed: Argo CD in namespace `argocd`, Argo Rollouts, the Gateway API CRDs, metrics for `kubectl top` and the HPA, Prometheus in namespace `monitoring`, and the CloudNativePG operator in `cnpg-system`. Argo CD has no web UI here: see and sync your Applications in Radar Cloud, or through your agent. It picks up Applications in `team-*` namespaces, and your Argo CD project is `team-<team-name>`.
+Already installed: Argo CD in namespace `argocd`, Argo Rollouts, the Gateway API CRDs, metrics for `kubectl top` and the HPA, Prometheus in namespace `monitoring`, the CloudNativePG operator in `cnpg-system`, and Radar in `radar` (don't upgrade it). Argo CD has no web UI here: see and sync your Applications in Radar Cloud, or through your agent. It picks up Applications in `team-*` namespaces, and your Argo CD project is `team-<team-name>`.
 
 **Metrics history.** Prometheus (`monitoring/prometheus-server`) scrapes your pods' CPU, memory and network, the kubelet, kube-state-metrics, and any pod or Service annotated `prometheus.io/scrape: "true"` (plus `prometheus.io/port` and `prometheus.io/path` if it isn't `/metrics`), every 30 seconds, and keeps 7 days. Radar finds it on its own: workloads get metric charts in Radar Cloud, and your agent can call `discover_metrics` to see what's there and `query_prometheus` to run PromQL. It doesn't count against your budget. It sees only your cluster. There's no node-exporter (the host refuses it) and no Alertmanager.
 

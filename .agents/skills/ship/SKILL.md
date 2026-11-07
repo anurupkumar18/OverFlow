@@ -17,7 +17,13 @@ Skip this if `get_resource` (kind `Application`, group `argoproj.io`, name `app`
 
 1. If `deploy/kustomization.yaml` still says `team-__TEAM__`, run `./scripts/setup.sh <team>` first. Ask for the team name if you don't know it.
 2. Push (step 1 below) and wait for the first build (step 2).
-3. The GHCR image must be public, and usually already is. Ask the person to check that the package on their repo page (Packages, right-hand column) says Public. If it says Private, they change it: Package settings > Change visibility > Public. You can't do this for them; wait until they confirm.
+3. The GHCR image must be public, and usually already is. Check it without credentials, with `newName` (minus `ghcr.io/`) and `newTag` from `deploy/kustomization.yaml`:
+   ```bash
+   repo=<owner>/<repo>; tag=<tag>
+   token=$(curl -s "https://ghcr.io/token?scope=repository:$repo:pull" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+   curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $token" -H 'Accept: application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json' "https://ghcr.io/v2/$repo/manifests/$tag"
+   ```
+   `200` is public: go on. `401` or `403` is private: ask the person to open the package on their repo page (Packages, right-hand column) > Package settings > Change visibility > Public. You can't do this for them; wait until they confirm, then check again. `404` means that tag wasn't built: see step 2.
 4. Apply `argocd/application.yaml` with `apply_resource` (with `cluster`). The starter app is already running; Argo CD takes it over. Keep the app’s reconciled manifests in GitOps. Direct Secrets and temporary Jobs follow the [agent workflows](../../../examples/agent-workflows/README.md) recipe.
 
 ## 1. Push
