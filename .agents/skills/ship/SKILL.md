@@ -18,17 +18,17 @@ Skip this if `get_resource` (kind `Application`, group `argoproj.io`, name `app`
 1. If `deploy/kustomization.yaml` still says `team-__TEAM__`, run `./scripts/setup.sh <team>` first. Ask for the team name if you don't know it.
 2. Push (step 1 below) and wait for the first build (step 2).
 3. The GHCR image must be public, and usually already is. Ask the person to check that the package on their repo page (Packages, right-hand column) says Public. If it says Private, they change it: Package settings > Change visibility > Public. You can't do this for them; wait until they confirm.
-4. Apply `argocd/application.yaml` with `apply_resource` (with `cluster`). This is the only app manifest you apply straight to the cluster. The starter app is already running; Argo CD takes it over.
+4. Apply `argocd/application.yaml` with `apply_resource` (with `cluster`). The starter app is already running; Argo CD takes it over. Keep the app’s reconciled manifests in GitOps. Direct Secrets and temporary Jobs follow the [agent workflows](../../../examples/agent-workflows/README.md) recipe.
 
 ## 1. Push
 
-Commit and push to `main`. Note the short SHA: `git rev-parse --short=7 HEAD`.
+Commit and push to `main`. Note the full commit SHA (`git rev-parse HEAD`) and its seven-character image tag (`git rev-parse --short=7 HEAD`).
 
-The Action skips commits that only touch `*.md` or `deploy/kustomization.yaml`. Changes only under `deploy/` (other than the image) need no build, so go straight to step 3.
+The Action skips pushes changing only Markdown and/or `deploy/kustomization.yaml`. Markdown-only changes need no deployment. For an intentional kustomization-only change, skip step 2, retain the existing image tag as the expected app version, and verify the configuration change after sync. Every other push, including other files under `deploy/`, triggers a build.
 
 ## 2. Wait for the build
 
-With the GitHub CLI: `gh run list --branch main --limit 1`, then `gh run watch <id> --exit-status`. Without it: `git fetch origin` until `origin/main` has a commit `deploy: <sha> [skip ci]`.
+With the GitHub CLI: `gh run list --workflow build-and-deploy --commit <full-sha>`, then `gh run watch <id> --exit-status` for that commit’s run. Do not use the latest run without matching its commit. If the run is not listed yet, retry briefly within the five-minute deadline; absence is not success. If the run is cancelled or superseded, report that this commit was not built. Verify a newer commit only if it contains the intended change and the person has authorized deploying it; otherwise report the blocker. Without the CLI, use the same deadline while checking `git fetch origin` until `origin/main` has a commit `deploy: <sha> [skip ci]`.
 
 If the run failed, read `gh run view <id> --log-failed`, fix it, and push again. Then `git pull --rebase` so your copy has the bot's deploy commit before you push again.
 
@@ -36,7 +36,7 @@ If the run failed, read `gh run view <id> --log-failed`, fix it, and push again.
 
 Argo CD polls git every few minutes. Don't wait for it: call `manage_gitops` with `cluster`, `tool: argocd`, `action: sync`, `namespace: team-<team>`, `name: app`.
 
-Radar's sync ignores the Application's own `syncOptions`. The starter's Application has none and needs none. If you added `syncOptions` to an Application (say `ServerSideApply=true` for large CRDs, or `CreateNamespace=true` for a new namespace), pass the same list as `sync_options` on every sync of it.
+The starter's Application has no `syncOptions` and needs none. If an Application has options (such as `ServerSideApply=true` for large CRDs or `CreateNamespace=true`), read the live Application immediately before syncing and pass its complete current list as `sync_options`. Do not use a cached list or pass only one added option. This preserves the options on Radar v1.19.0, which does not inherit them; Radar’s current sync implementation inherits them when omitted, but an explicit list replaces them for that sync.
 
 Then `get_resource` on the Application and check both of these:
 - `status.sync.revision` equals `git rev-parse origin/main` (after `git fetch`);
@@ -44,19 +44,21 @@ Then `get_resource` on the Application and check both of these:
 
 ## 4. Wait for the rollout
 
+First read the live Deployment or Rollout with `get_resource` and confirm its app container image matches the expected image/tag from the remote `deploy/kustomization.yaml`. A healthy old workload does not prove this push deployed.
+
 Call `wait_for` with `kind: deployment` (or `rollout` if `deploy/` uses `rollout.yaml`) and `name: app`. Each call waits at most 45 seconds, so repeat it until it reports done, for up to about 5 minutes.
 
 A Rollout pauses at 25% on purpose. For that flow, use the `canary-release` skill.
 
 ## 5. Verify from outside
 
-`curl -s https://<team>.cnh.radarhq.io/`. The starter app prints `version <sha>`, and it must match the SHA from step 1. If you replaced the app, request something your change made visible.
+`curl -s https://<team>.cnh.radarhq.io/`. The starter app prints `version <sha>`, and it must match the built SHA from step 1, or the unchanged image tag for a deliberately skipped build. For a configuration-only change, also verify the intended configuration took effect. If you replaced the app, request something your change made visible.
 
 If anything here is red (a failed sync, pods not ready, the old version still serving, a 404 or 503 from the URL), switch to the `debug-failure` skill. Don't push guesses.
 
 ## Don't
 
 - Don't call a Radar tool without `cluster`.
-- Don't apply app manifests with `apply_resource` or `patch_resource`. Argo CD's self-heal reverts them within seconds.
+- Don't apply Argo CD-owned app manifests with `apply_resource` or `patch_resource`. Argo CD's self-heal reverts them within seconds.
 - Don't edit `newName` or `newTag` in `deploy/kustomization.yaml`; the Action owns them.
 - Don't report "deployed" after the push. Report what step 5 showed.

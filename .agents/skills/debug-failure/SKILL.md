@@ -5,7 +5,7 @@ description: Find the root cause of a failure in this team's cluster at the hack
 
 # Debug a failure, fix it in git
 
-Work from evidence: read what Radar shows, name the cause, then change the repo. The cluster reverts direct edits (Argo CD self-heal), so every fix ships as a commit.
+Work from evidence: read what Radar shows, name the cause, then change the repo. Argo CD reverts direct edits to resources it owns, so fixes to those resources ship as commits. Non-git credential Secrets follow the [agent workflows](../../../examples/agent-workflows/README.md) recipe; never commit their values.
 
 The namespace is `team-<team>`, from `namespace:` in `deploy/kustomization.yaml`, and Radar Cloud lists the team's cluster as `<team>`.
 
@@ -34,23 +34,24 @@ Tell the person what you did before you go deeper.
 | --- | --- | --- |
 | `ImagePullBackOff`, 401/403/denied | The GHCR package is still private | The person makes it public: repo > Packages > Package settings > Change visibility |
 | `ImagePullBackOff`, not found | The tag wasn't built (the Action failed) | `gh run view --log-failed`, fix the build |
+| `CreateContainerConfigError`, missing Secret or key | The referenced non-git Secret or key is missing or misspelled | Have the person create or correct the Secret in Radar’s resource editor. Keep values out of git and agent output. Restart if an already-running app needs updated environment variables; correct a wrong Secret reference in git. |
 | `OOMKilled`, exit 137 | The container passed `limits.memory` | Fix the app's memory use, or raise the limit in `deploy/` (the team's budget caps limits at 8 GiB in total) |
 | `CrashLoopBackOff` | The app exits at startup | `get_pod_logs` with `previous: true` |
 | Ready 0/N, readiness failing | The app isn't on `$PORT` (8080), or `/readyz` doesn't answer 200 | Fix the app, or the probe paths in `deploy/` |
 | Pod `Pending`, Warning `SyncError` saying `exceeded quota: team-quota` | Over the team's budget, one total across every namespace in the cluster: 2 CPU / 4 GiB of requests, 4 CPU / 8 GiB of limits | Lower `replicas` or `requests`, or remove something you installed |
 | Pod `Pending`, any other Warning `SyncError` | The host refused the pod: it asks for privileged, hostPath, hostNetwork or hostPID. The event's message has the host's reason | Drop that setting (for a Helm chart, in its values). The host's rules don't bend |
-| Old version still serving | Argo CD hasn't synced, or the sync failed | The `ship` skill, steps 2 and 3 |
+| Version differs from the expected image tag | Build or sync has not completed | Follow the `ship` skill. A kustomization-only fix intentionally keeps the old app version; verify its configuration instead. |
 | URL 404 or 503, pods healthy | Service `app` in `team-<team>` is missing, renamed, not on port 80, or selects no ready pods. The platform routes the URL to that Service; the HTTPRoute in `deploy/` plays no part | `diagnose` the Service (`kind: service`, `name: app`) with `probe: true`, and fix it in `deploy/`. If the Service is fine, ask an organizer |
-| Sync fails: namespace not found, or `metadata.annotations: Too long` on a CRD | The Application needs `CreateNamespace=true` or `ServerSideApply=true`, and Radar's sync ignores the Application's own `syncOptions` | Add them to the Application's `syncOptions` and pass the same list as `sync_options` to `manage_gitops` sync |
+| Sync fails: namespace not found, or `metadata.annotations: Too long` on a CRD | The Application needs `CreateNamespace=true` or `ServerSideApply=true` | Add them to its `syncOptions`, read the live Application, and pass its complete current list as `sync_options`; follow the `ship` skill’s version-specific guidance |
 
 ## 4. Fix, ship, confirm
 
-Make the smallest change that removes the cause, push it, and follow the `ship` skill to the end, including step 5: the URL must show the fixed commit's version, not just answer 200. Confirm `issues` no longer lists the problem.
+Make the smallest change that removes the cause. For repo changes, push and follow the `ship` skill through step 5: verify the built SHA, or the unchanged image tag plus the intended configuration for a deliberately skipped build. For a non-git Secret correction, verify the app's authenticated operation without printing the credential. Confirm `issues` no longer lists the problem.
 
 ## 5. When it's not obvious
 
-Suggest the person start an AI investigation in Radar Cloud: open the failing resource at app.radarhq.io and click Investigate. It traces the failure to a root cause with evidence and changes nothing. Investigations are private unless the person shares them, and sharing shows them to every team in the org.
+Suggest a hosted AI investigation and explain that it uses the shared organization allowance and may incur billed overage if an owner enabled it. Once the person has requested or approved it, use the hosted tools if the organization-level `/mcp` connection advertises `start_investigation`; follow `examples/agent-workflows/README.md`. Otherwise the person can open the resource at app.radarhq.io and click Investigate. The investigation tools do not apply remediation. Verify findings against primary evidence and apply fixes through the resource’s owner. New interactive runs, including MCP starts, are private unless the person shares them; sharing shows them to every team in the org.
 
 ## Report
 
-Give the person three things: the cause, with the evidence that shows it; the commit that fixed it; and what you checked to confirm it's fixed.
+Give the person three things: the cause, with the evidence that shows it; the commit or non-git Secret correction that fixed it; and what you checked to confirm it's fixed.

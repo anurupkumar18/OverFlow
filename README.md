@@ -61,7 +61,7 @@ Pick what your project needs. None of it is required, and more doesn't score hig
 | Ship every push and know it worked | GitOps, the Application's page | "Ship this, and tell me when it's healthy and live." |
 | Find what's broken right now | Issues, the workload's Timeline and Logs | "What's unhealthy in our cluster, and why?" |
 | See what changed | Timeline, with diffs | "What changed in the last hour?" |
-| Trace a failure to its cause | **Investigate** on the failing resource | You start this one in Radar Cloud. |
+| Trace a failure to its cause | **Investigate** on the failing resource | Request a hosted investigation when available; otherwise start it in Radar Cloud. |
 | Check health and security | Checks | "Review Checks for our namespace and fix what applies." |
 | See load and resource use over time | The workload's Metrics tab | "Is our memory climbing? Are our requests sized right?" |
 | Add a database | Helm, Resources | "Create a small Postgres for us" (`examples/postgres`). |
@@ -69,6 +69,8 @@ Pick what your project needs. None of it is required, and more doesn't score hig
 | Release carefully, or autoscale | The Rollout's page: Promote, Abort | "Switch us to canary releases" (`examples/canary`), or "Add autoscaling" (`examples/hpa`). |
 
 **Going further:** Radar also understands OpenTelemetry, Sealed Secrets, Argo Workflows and Argo Rollouts analysis, among others. You're cluster-admin, so install what your project needs (see [Your cluster](#your-cluster)).
+
+For credentials, one-off Jobs, dependencies and checking the running app, see [the optional agent workflows](examples/agent-workflows/README.md).
 
 Replace `app/` with your own project whenever you like. Keep it listening on `$PORT` (8080) with `/healthz` and `/readyz`, or update the probes in `deploy/`.
 
@@ -109,7 +111,10 @@ It's ready in about a minute. Your app connects to `db-rw:5432`; the user, passw
 
 ```bash
 helm repo add nats https://nats-io.github.io/k8s/helm/charts/
-helm upgrade --install nats nats/nats --namespace nats --create-namespace
+helm repo update nats
+helm search repo nats/nats --versions
+# Choose an exact version from the results, then replace CHART_VERSION below.
+helm upgrade --install nats nats/nats --version CHART_VERSION --namespace nats --create-namespace
 ```
 
 Or ask your agent to apply an operator's manifest with Radar's `apply_resource`, or to keep it in git as another Argo CD Application in `team-<team-name>`: your project `team-<team-name>` takes any source repo, any namespace in your cluster, and cluster-scoped resources.
