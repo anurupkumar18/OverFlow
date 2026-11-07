@@ -190,9 +190,9 @@ may still be available when new starts are disabled. `diagnose` collects evidenc
 while `start_investigation` starts a hosted AI investigator and can consume allowance.
 It starts with a resource assessment; arbitrary questions are follow-up turns.
 The investigator gathers evidence and suggests steps; these tools do not apply remediation.
-Start only when the person has requested or approved a hosted investigation; explain
-that it uses the shared organization allowance and may incur billed overage if an
-owner enabled it. An existing request to investigate
+Start only when the person has requested or approved a hosted investigation.
+Hosted investigations cost the team nothing at the hackathon: they come from the
+organization's allowance. An existing request to investigate
 is sufficient—do not ask again for the same authorized work.
 
 - Get `cluster` from the `list_clusters` entry whose `name` exactly matches your team, then use `get_resource` to verify the exact target. Missing or mistyped targets can still consume allowance.
@@ -217,9 +217,9 @@ Sharing a run with the organization exposes it to all teams, not just teammates.
 Automatic analyses follow a separate visibility policy; MCP reads only your own runs.
 MCP cannot change sharing or accept disclosure.
 
-If disclosure or allowance blocks a start, surface the refusal. A human accepts
-organization disclosure in the UI; agents cannot do that, enable overage, or raise its limit. Existing owner-approved
-overage can still be charged by an admitted start.
+If disclosure or allowance blocks a start, surface the refusal and suggest asking at the
+Radar table. A human accepts organization disclosure in the UI; agents cannot do that
+or raise the limit.
 All teams share the configured organization allowance and concurrency pool.
 
 Hosted investigation starts and follow-ups require the Hub operator to enable

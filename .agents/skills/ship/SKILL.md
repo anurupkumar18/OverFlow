@@ -26,11 +26,13 @@ Commit and push to `main`. Note the full commit SHA (`git rev-parse HEAD`) and i
 
 The Action skips pushes changing only Markdown and/or `deploy/kustomization.yaml`. Markdown-only changes need no deployment. For an intentional kustomization-only change, skip step 2, retain the existing image tag as the expected app version, and verify the configuration change after sync. Every other push, including other files under `deploy/`, triggers a build.
 
-## 2. Wait for the build
+## 2. Wait for the build, then pull its deploy commit
 
 With the GitHub CLI: `gh run list --workflow build-and-deploy --commit <full-sha>`, then `gh run watch <id> --exit-status` for that commit’s run. Do not use the latest run without matching its commit. If the run is not listed yet, retry briefly within the five-minute deadline; absence is not success. If the run is cancelled or superseded, report that this commit was not built. Verify a newer commit only if it contains the intended change and the person has authorized deploying it; otherwise report the blocker. Without the CLI, use the same deadline while checking `git fetch origin` until `origin/main` has a commit `deploy: <sha> [skip ci]`.
 
-If the run failed, read `gh run view <id> --log-failed`, fix it, and push again. Then `git pull --rebase` so your copy has the bot's deploy commit before you push again.
+If the run failed, read `gh run view <id> --log-failed`, fix it, push again, and wait again.
+
+**Then pull, after every green run.** Run `git pull --rebase` so your copy has the bot's `deploy: <sha> [skip ci]` commit. Do it even if you have nothing else to push yet: without it, your next push is rejected.
 
 ## 3. Sync
 

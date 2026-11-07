@@ -6,7 +6,7 @@ Start here if your team has its own cluster at the hackathon: a virtual Kubernet
 
 - 11:00: before you write any code, get your cluster, open it in Radar Cloud, and connect your agent to Radar (steps below).
 - First hour: open **Checks** for your cluster and take a screenshot. That's your "before".
-- All day, work through Radar: your agent pushes, syncs and waits for each rollout through Radar's MCP. When something breaks, look in Radar first, and start an AI investigation on anything you can't explain.
+- All day, work through Radar: your agent pushes, syncs and waits for each rollout through Radar's MCP. When something breaks, look in Radar first, and start an AI investigation on anything you can't explain. Run at least one investigation today (the judges look for it). Nothing broke? Investigate your app after a release: it ends with an all-clear and the evidence, which counts.
 - By 5:30: tell the day's story from Radar: the timeline, the investigation, and Checks before and after. It's only there if you used Radar all day.
 - The winning team gets $4,000. Hackathon clusters and access to the hackathon org end on Friday, November 13.
 
@@ -18,7 +18,9 @@ Get your team's cluster at **join.cnh.radarhq.io** (the join code is shared at t
 - this starter app already running in it, in namespace `team-<team-name>`, at `https://<team-name>.cnh.radarhq.io`,
 - an invite for each of you to the hackathon's organization in Radar Cloud. Accept it and sign in at [app.radarhq.io](https://app.radarhq.io).
 
-Every team is in the same Radar Cloud organization, so Radar Cloud lists every team's cluster, each under its team's name, plus `cnh`, the platform's own cluster. You only have access to your own team's cluster. The member list, with emails, and any investigation you mark **Shared** are visible to every team. Investigations start private; keep them that way unless you mean to show every team. Alert notifications are off for the event, because they would go to everyone.
+**Joining a team that already started?** Don't fill in the join form or copy the template again: ask your team for the repo, and ask us at the Radar table to add your email.
+
+Every team is in the same Radar Cloud organization, so Radar Cloud lists every team's cluster, each under its team's name, plus `cnh`, the platform's own cluster. You only have access to your own team's cluster. The member list (with emails), the Alerts page and the bell (each alert's resource, namespace and status), and any investigation you mark **Shared** are visible to every team. Investigations start private: only the person who started one can open it. So that person shows it at 5:30, or shares it on purpose, and then every team can read it. Alert notifications are off for the event, because they would go to everyone.
 
 ## Connect your agent
 
@@ -30,9 +32,9 @@ claude mcp add radar-cloud --transport http https://api.radarhq.io/mcp
 
 It signs you in through your browser the first time. If you're in more than one Radar Cloud organization, pick **Cloud Native Hackathon** under "Organization access" on that page. Then give it a first prompt:
 
-> Read AGENTS.md, find our team's cluster in Radar, and tell me what's running in our namespace. Don't change anything yet.
+> Find our team's cluster in Radar (it's named <team-name>) and tell me what's running in team-<team-name>. Don't change anything yet.
 
-Every Radar MCP tool takes a `cluster` id, and your agent must pass yours on every call: the organization has about 40 clusters. AGENTS.md tells it how to find the id.
+Every Radar MCP tool takes a `cluster` id, and your agent must pass yours on every call: the organization has about 40 clusters. Once you have your repo (below), run your agent in it: AGENTS.md tells it how to find the id and how to ship.
 
 This repo also has skills for shipping, debugging and canaries in `.agents/skills/`. Claude Code and Codex pick them up on their own.
 
@@ -47,7 +49,7 @@ This repo also has skills for shipping, debugging and canaries in `.agents/skill
    The `git pull` picks up a commit the Action may already have made when GitHub created your repo. The Action builds the image and pushes it to GHCR. Wait for it to go green (the repo's **Actions** tab).
 3. **Check the image is public.** On your repo's GitHub page, open **Packages** (right-hand column) and your image: it should say **Public**, and usually already does. If it says **Private**, open **Package settings** > **Change visibility** > **Public**, because your cluster can't pull a private image.
 4. **Start GitOps.** Ask your agent to apply `argocd/application.yaml` to your cluster through Radar's MCP server. Argo CD takes over the starter app and from then on deploys every push to `main`.
-5. **Check it's yours.** Open `https://<team-name>.cnh.radarhq.io`. It shows `version` and the first 7 characters of your latest commit.
+5. **Check it's yours.** Open `https://<team-name>.cnh.radarhq.io`. It shows `version` and the first 7 characters of the commit you pushed: the Action tags the image with it. The bot's `deploy:` commit after yours has its own SHA; ignore that one.
 
 One person can do this while the others accept their invites.
 
@@ -94,7 +96,7 @@ Pick what your project needs. None of it is required, and more doesn't score hig
 
 For credentials, one-off Jobs, dependencies and checking the running app, see [the optional agent workflows](examples/agent-workflows/README.md).
 
-Replace `app/` with your own project whenever you like. Keep it listening on `$PORT` (8080) with `/healthz` and `/readyz`, or update the probes in `deploy/`.
+Replace `app/` with your own project whenever you like. Keep it listening on `$PORT` (8080) with `/healthz` and `/readyz`, or update the probes in `deploy/`. The Dockerfile installs the dependencies in `app/package.json`; for another language, change the Dockerfile too.
 
 ## What the judges look for
 

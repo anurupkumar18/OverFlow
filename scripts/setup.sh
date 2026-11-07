@@ -19,6 +19,11 @@ if [[ ! "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   exit 1
 fi
 repo_lower="$(printf '%s' "$repo" | tr '[:upper:]' '[:lower:]')"
+if [[ "$repo_lower" == skyhook-io/cnh-starter ]]; then
+  echo "This is a clone of the template itself. Click Use this template on GitHub to make your own" >&2
+  echo "public copy, clone that, and run this inside it." >&2
+  exit 1
+fi
 
 files=$(grep -rl -e __TEAM__ -e OWNER/REPO deploy argocd examples AGENTS.md || true)
 for f in $files; do
@@ -37,7 +42,8 @@ for f in $files; do
 done
 
 cat <<EOF
-Done. Your namespace is team-${team}, your URL is https://${team}.cnh.radarhq.io.
+Done. Your cluster is ${team} in Radar Cloud (the app runs in namespace team-${team} inside it),
+and your URL is https://${team}.cnh.radarhq.io.
 
 Next:
   1. git commit -am "Set up team ${team}" && git pull --rebase && git push

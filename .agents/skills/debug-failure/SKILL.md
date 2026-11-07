@@ -13,7 +13,7 @@ The namespace is `team-<team>`, from `namespace:` in `deploy/kustomization.yaml`
 
 ## 1. Stop the damage first
 
-- **Canary paused or crash-looping** (`deploy/` uses `rollout.yaml`): call `manage_rollout` with `action: abort`. The stable version takes all traffic back at once. The next pushed version starts a fresh canary.
+- **Canary crash-looping or failing its checks** (`deploy/` uses `rollout.yaml`): call `manage_rollout` with `action: abort`. A canary that is only paused at its step isn't broken: that's the person's release decision, so don't abort it; use the `canary-release` skill. The stable version takes all traffic back at once. The next pushed version starts a fresh canary.
 - **Plain Deployment broken after a push**: the rollback is `git revert <bad commit>` and a push. Don't use `manage_gitops` rollback: auto-sync puts `main` back.
 
 Tell the person what you did before you go deeper.
@@ -50,7 +50,7 @@ Make the smallest change that removes the cause. For repo changes, push and foll
 
 ## 5. When it's not obvious
 
-Suggest a hosted AI investigation and explain that it uses the shared organization allowance and may incur billed overage if an owner enabled it. Once the person has requested or approved it, use the hosted tools if the organization-level `/mcp` connection advertises `start_investigation`; follow `examples/agent-workflows/README.md`. Otherwise the person can open the resource at app.radarhq.io and click Investigate. The investigation tools do not apply remediation. Verify findings against primary evidence and apply fixes through the resource’s owner. New interactive runs, including MCP starts, are private unless the person shares them; sharing shows them to every team in the org.
+Suggest a hosted AI investigation. Hosted investigations cost the team nothing at the hackathon: they come from the organization's allowance. Once the person has asked for one, use the hosted tools if the organization-level `/mcp` connection advertises `start_investigation`; follow `examples/agent-workflows/README.md`. Otherwise the person can open the resource at app.radarhq.io and click Investigate. The investigation tools do not apply remediation. Verify findings against primary evidence and apply fixes through the resource’s owner. New interactive runs, including MCP starts, are private unless the person shares them; sharing shows them to every team in the org.
 
 ## Report
 
