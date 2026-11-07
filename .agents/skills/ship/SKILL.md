@@ -44,6 +44,8 @@ Then `get_resource` on the Application and check both of these:
 - `status.sync.revision` equals `git rev-parse origin/main` (after `git fetch`);
 - `status.sync.status` is `Synced` and `status.health.status` is `Healthy`, or `Progressing` while pods start.
 
+Right after the first sync, the Application can read `OutOfSync` for a moment: a sync started from Radar doesn't prune, so the starter's old `app-code` ConfigMap stays until Argo CD's own automatic sync removes it, seconds later. That's expected. Do step 4, then check the Application again: it goes `Synced` on its own.
+
 ## 4. Wait for the rollout
 
 First read the live Deployment or Rollout with `get_resource` and confirm its app container image matches the expected image/tag from the remote `deploy/kustomization.yaml`. A healthy old workload does not prove this push deployed.
