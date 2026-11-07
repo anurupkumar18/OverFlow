@@ -147,12 +147,67 @@ It talks to `https://<team-name>.vc.cnh.radarhq.io`. Its token lasts 24 hours an
 
 ## Bringing a cluster of your own instead
 
-The same repo works on a cluster you bring (kind, k3d, minikube or a cloud cluster) with Argo CD installed, and Argo Rollouts if you use `examples/canary`:
+You can run on a cluster you bring (kind, k3d, minikube or a cloud cluster, including one on your laptop) instead of the one we give you. It still counts for judging.
 
-1. Connect the cluster to your own free Radar Cloud organization: sign up at [app.radarhq.io](https://app.radarhq.io), click **Connect a cluster**, and run the Helm command it gives you.
-2. Run `./scripts/setup.sh <team-name>`, then delete the `- httproute.yaml` line from `deploy/kustomization.yaml` (it points at the hackathon's gateway). Push.
-3. Apply `argocd/application-byo.yaml` instead of `argocd/application.yaml`: it uses Argo CD's `default` project and creates the namespace.
-4. Reach the app with Radar's port-forward, or `kubectl -n team-<team-name> port-forward svc/app 8080:80`.
+**Use your own Radar Cloud organization, not the hackathon's.** Don't add your cluster to Cloud Native Hackathon: every team could see it there. Your own organization is free: up to 3 clusters and 100 AI investigations a month. You also lose the public URL, Prometheus and organizer access to your cluster.
+
+### On your laptop, in one command
+
+This is for a few teams, if the shared cluster has a problem. You need Docker running (Docker Desktop, OrbStack, colima or Rancher Desktop) with about 4 GB of memory free, `kubectl`, `helm`, and k3d (`brew install k3d`; kind or minikube work too). In your copy of this repo:
+
+```bash
+./scripts/local-cluster.sh <team-name>
+```
+
+It creates a one-node cluster, `cnh-<team-name>`, set up like the one the hackathon gives you: Argo CD, Argo Rollouts, the Gateway API CRDs, and namespace `team-<team-name>` with its Argo CD project. Your repo's manifests work there as they are. The script stops twice, for things only you can do:
+
+1. Connect the cluster to your own Radar Cloud organization: create it as in step 1 under [Any other cluster](#any-other-cluster), click **Connect a cluster**, name the cluster exactly `<team-name>`, and run the Helm command it shows in your terminal. The script never sees that command or its token.
+2. Push your repo, if you haven't yet (it runs `./scripts/setup.sh` for you first).
+
+Then it applies `argocd/application.yaml` and prints how to open the app (`kubectl port-forward`; there's no public URL on a laptop) and connect your agent to Radar's MCP server. Pick your own organization, not Cloud Native Hackathon, under "Organization access". Running it again is safe: it skips what's done. `./scripts/local-cluster.sh <team-name> --down` deletes the cluster.
+
+AGENTS.md describes the hackathon cluster. Add this at the top of it, with your names filled in:
+
+> **This team is NOT on the hackathon cluster.** We run our own cluster, `<team-name>`, on a laptop, in our own Radar Cloud organization `<your-org-name>`, not Cloud Native Hackathon; it's the only cluster there. There is no `https://<team-name>.cnh.radarhq.io`: check the new version through Radar's port-forward (or `kubectl -n team-<team-name> port-forward svc/app 8080:80`, then `http://localhost:8080`) instead. There's no Prometheus, and no budget or host limits apply here.
+
+Venue wifi is slow. Before the event, run `./scripts/local-cluster.sh --pull` to download the images and charts (about 500 MB); `--images` lists them.
+
+If your copy of this repo is older than the script, fetch it first:
+
+```bash
+curl -fsSL -o scripts/local-cluster.sh https://raw.githubusercontent.com/skyhook-io/cnh-starter/main/scripts/local-cluster.sh && chmod +x scripts/local-cluster.sh
+```
+
+### Any other cluster
+
+It needs Argo CD, and Argo Rollouts if you use `examples/canary`.
+
+1. **Create your organization.** Sign in at [app.radarhq.io](https://app.radarhq.io).
+   - New to Radar Cloud: name your organization when it asks.
+   - Already in Cloud Native Hackathon: open the menu under your name (bottom left) > **Create organization**. If the sign-in screen offers the hackathon invite, choose **Create a new organization instead**.
+
+   Invite your teammates from **Settings > Members**. Check that the organization switcher shows your new organization, not Cloud Native Hackathon, before the next step.
+2. **Connect your cluster.** Click **Connect a cluster** and name the cluster exactly `<team-name>`, the same name you give `setup.sh`. Your agent finds the cluster by that name. Run the Helm command it shows in a terminal whose kubectl context is your cluster (`kubectl config current-context`). The command carries your cluster's token: paste it into your terminal only, never into the repo, a chat or your agent.
+3. **Point the repo at your team.** Make your copy and clone it (step 1 of [Ship your own code](#ship-your-own-code)), then:
+   ```bash
+   ./scripts/setup.sh <team-name>
+   ```
+   Delete the `- httproute.yaml` line from `deploy/kustomization.yaml`: it points at the hackathon's gateway, and your cluster has none.
+4. **Tell your agent where it is.** AGENTS.md and the skills describe the hackathon cluster. Add this at the top of `AGENTS.md`, with your names filled in:
+   > **This team is NOT on the hackathon cluster.** We run our own cluster, `<team-name>`, in our own Radar Cloud organization `<your-org-name>`, not Cloud Native Hackathon; it's the only cluster there. The Argo CD Application is `app-<team-name>` in namespace `argocd` (project `default`), not `app` in `team-<team-name>`; use that name and namespace wherever a skill says `app`. There is no `https://<team-name>.cnh.radarhq.io`: check the new version through Radar's port-forward (or `kubectl -n team-<team-name> port-forward svc/app 8080:80`, then `http://localhost:8080`) instead. No budget or host limits apply here.
+5. **Push, and make the image public.**
+   ```bash
+   git commit -am "Set up team <team-name> on our own cluster" && git pull --rebase && git push
+   ```
+   Wait for the Action to go green (the repo's **Actions** tab), then make the image public once: on your repo's GitHub page, **Packages** > **Package settings** > **Change visibility** > **Public**. Your cluster can't pull a private image.
+6. **Start GitOps.** Create the namespace, then apply `argocd/application-byo.yaml`, not `argocd/application.yaml`:
+   ```bash
+   kubectl create namespace team-<team-name>
+   kubectl apply -f argocd/application-byo.yaml
+   ```
+   It uses Argo CD's `default` project.
+7. **Connect your agent** as in [Connect your agent](#connect-your-agent), but pick **your own organization** under "Organization access", not Cloud Native Hackathon.
+8. **Open your app** with Radar's port-forward, or `kubectl -n team-<team-name> port-forward svc/app 8080:80` and `http://localhost:8080`. It shows `version` and your latest commit.
 
 ## After today
 
