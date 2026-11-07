@@ -6,6 +6,8 @@ This repo deploys to this team's own Kubernetes cluster at the Cloud Native Hack
 
 Deploys are GitOps: change the repo, push to `main`, and Argo CD syncs the namespace. Pushing to `main` is how you deploy here, so when the person asks you to ship, fix, add or change something, that's the go-ahead to commit and push it; ask first only about changes they didn't ask for. Argo CD runs inside this cluster (namespace `argocd`) with no web UI; you drive it with `manage_gitops`. Your Argo CD Application `app` lives in `team-__TEAM__`, not in `argocd`: pass that namespace when you look it up, sync it or `diagnose` it. Don't apply or patch app manifests on the cluster. Argo CD's self-heal puts the repo's version back. Apply `argocd/application.yaml` once to start the sync. One-off Jobs and credential Secrets deliberately kept outside git can also be created directly when Argo CD does not own them; follow `examples/agent-workflows/README.md`.
 
+**Run shell commands one at a time, in plain form.** Claude Code asks the person to approve any command with `$(…)`, `$?` or shell variables, so avoid them: run `git rev-parse HEAD` on its own and use the SHA it prints in the next command; `gh run watch <id> --exit-status` already fails when the run fails, so don't echo `$?`; run `git pull --rebase` as its own command. Write and edit files with your file tools, not heredocs.
+
 ## When to do what
 
 - **The person asks to get set up, or what to do first.** Follow the `get-started` skill. It checks first, and asks once before it pushes and deploys.

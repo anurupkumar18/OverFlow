@@ -50,7 +50,7 @@ First read the live Deployment or Rollout with `get_resource` and confirm its ap
 
 Call `wait_for` with `kind: deployment` (or `rollout` if `deploy/` uses `rollout.yaml`) and `name: app`. Each call waits at most 45 seconds, so repeat it until it reports done, for up to about 5 minutes. New pods running the new image also prove the image is public.
 
-If the new pods show `ImagePullBackOff` or `ErrImagePull`, check the image without credentials, with `newName` (minus `ghcr.io/`) and `newTag` from `deploy/kustomization.yaml`:
+If the new pods show `ImagePullBackOff` or `ErrImagePull`, check the image without credentials, with `newName` (minus `ghcr.io/`) and `newTag` from `deploy/kustomization.yaml` (it uses shell variables, so Claude Code asks the person to approve it: say why first):
 ```bash
 repo=<owner>/<repo>; tag=<tag>
 token=$(curl -s "https://ghcr.io/token?scope=repository:$repo:pull" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
