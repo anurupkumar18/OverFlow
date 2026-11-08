@@ -9,12 +9,13 @@ const dayFormat = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'l
 const shortDayFormat = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short', month: 'short', day: 'numeric' });
 const dateKeyFormat = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' });
 const storageKey = 'overflow.personal-plan.v1';
+const interestStorageKey = 'overflow.shared-interest.v1';
 const state = {
   filters: { q: '', day: '', track: '', available: false },
-  items: new Map(), saved: new Map(), config: null, mode: null, view: 'discover',
+  items: new Map(), saved: new Map(), sharedInterest: new Set(), config: null, mode: null, view: 'discover',
   searchSequence: 0, dialogSequence: 0, searchController: null, dialogController: null,
   debounce: null, toastTimer: null, dialogSource: null, lastFocus: null, storageAvailable: true,
-  loaded: [], nextOffset: null, total: 0, facetDays: '',
+  loaded: [], nextOffset: null, total: 0, facetDays: '', completedFilters: null,
 };
 
 function time(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Time unavailable' : timeFormat.format(date); }
@@ -23,8 +24,74 @@ function day(value, short = false) { const date = new Date(value); return Number
 function dayFromKey(value) { return new Date(`${value}T12:00:00-07:00`); }
 function safeUrl(value) { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : null; } catch { return null; } }
 function savedTalks() { return [...state.saved.values()].sort((a, b) => new Date(a.start) - new Date(b.start) || a.title.localeCompare(b.title)); }
-function cacheTalk(talk) { if (talk?.id) state.items.set(String(talk.id), talk); }
+function cacheTalk(talk) {
+  if (!talk?.id) return;
+  const id = String(talk.id);
+  state.items.set(id, talk);
+  // Only a current API response can refresh crowd state in the in-memory plan.
+  if (state.saved.has(id)) state.saved.set(id, talk);
+}
+function personalSnapshot(talk) {
+  const { fullness, why_matched, ...schedule } = talk;
+  return { ...schedule, fullness: { capacity: talk.capacity ?? fullness?.capacity ?? null, capacity_source: 'estimate', bookmarks: null, reports: null, pressure: null, likely_full: null, signal: 'unavailable' } };
+}
+function filtersKey(filters = state.filters) {
+  return JSON.stringify({ q: filters.q, day: filters.day, track: filters.track, available: filters.available });
+}
+function invalidatePagination() {
+  state.nextOffset = null;
+  state.completedFilters = null;
+  $('#load-more').disabled = true;
+  $('#load-more').hidden = true;
+}
+function reconcileSaveControls() {
+  document.querySelectorAll('[data-action="save"]').forEach((button) => {
+    const saved = state.saved.has(button.dataset.id);
+    button.setAttribute('aria-pressed', String(saved));
+    button.setAttribute('aria-label', `${saved ? 'Remove' : 'Save'} ${findTalk(button.dataset.id)?.title || 'talk'}${saved ? ' from' : ' to'} my plan`);
+    if (button.classList.contains('dialog-save')) button.innerHTML = `${icon(saved ? 'check' : 'bookmark')} ${saved ? 'Saved to my plan' : 'Save to my plan'}`;
+  });
+}
 function findTalk(id) { return state.items.get(String(id)) || state.saved.get(String(id)); }
+function reconcileInterestControls() {
+  document.querySelectorAll('[data-action="share-interest"]').forEach((button) => {
+    const shared = state.sharedInterest.has(button.dataset.id);
+    button.setAttribute('aria-pressed', String(shared));
+    button.innerHTML = `${icon(shared ? 'check' : 'signal')} ${shared ? 'Withdraw interest' : 'Share interest'}`;
+  });
+}
+function loadSharedInterest() {
+  state.sharedInterest.clear();
+  try {
+    const data = JSON.parse(localStorage.getItem(interestStorageKey) || '[]');
+    if (Array.isArray(data)) data.slice(0, 600).forEach((id) => { if (typeof id === 'string' && /^[a-zA-Z0-9_-]{1,120}$/.test(id)) state.sharedInterest.add(id); });
+  } catch { /* A missing local receipt never claims remote interest. */ }
+}
+function signalCountsText(talk) {
+  const full = talk.fullness || {};
+  return full.signal === 'live'
+    ? `${Number.isFinite(full.bookmarks) ? full.bookmarks : 'Unknown'} crowd bookmarks. ${Number.isFinite(full.reports) ? full.reports : 'Unknown'} full-room reports.`
+    : 'Crowd bookmarks and full-room reports are unavailable, rather than zero.';
+}
+function refreshRoomSignals(talk) {
+  cacheTalk(talk);
+  if (state.saved.has(String(talk.id))) renderPersonalPlan();
+  document.querySelectorAll('[data-talk-id]').forEach((element) => {
+    if (element.dataset.talkId !== String(talk.id)) return;
+    const signal = $('.room-signal', element);
+    if (signal) signal.innerHTML = signalMarkup(talk);
+    const counts = $('.signal-counts', element);
+    if (counts) counts.textContent = signalCountsText(talk);
+  });
+}
+function renderServiceHealth(status) {
+  const label = $('#service-health');
+  const metricsAvailable = status?.status === 'available' && Number.isFinite(status.p95_ms) && Number.isFinite(status.error_ratio) && Number.isFinite(status.degraded_share);
+  label.classList.toggle('has-metrics', metricsAvailable);
+  label.textContent = metricsAvailable ? `Service health: p95 ${Math.round(status.p95_ms)} ms · ${(status.error_ratio * 100).toFixed(1)}% errors` : 'Service health: unavailable';
+  label.title = metricsAvailable ? `Fallback responses: ${(status.degraded_share * 100).toFixed(1)}%. Measured at ${status.as_of || 'an unspecified time'}.` : 'Verified service metrics are unavailable. No latency or reliability figures are assumed.';
+}
+
 
 function announce(message) {
   const toast = $('#toast');
@@ -37,12 +104,12 @@ function loadSaved() {
   try {
     const data = JSON.parse(localStorage.getItem(storageKey) || '[]');
     if (Array.isArray(data)) for (const talk of data.slice(0, 600)) {
-      if (talk && typeof talk.id === 'string' && typeof talk.title === 'string' && Array.isArray(talk.speakers) && !Number.isNaN(Date.parse(talk.start)) && !Number.isNaN(Date.parse(talk.end))) state.saved.set(talk.id, talk);
+      if (talk && typeof talk.id === 'string' && typeof talk.title === 'string' && Array.isArray(talk.speakers) && !Number.isNaN(Date.parse(talk.start)) && !Number.isNaN(Date.parse(talk.end))) state.saved.set(talk.id, personalSnapshot(talk));
     }
   } catch { state.storageAvailable = false; }
 }
 function persistSaved() {
-  try { localStorage.setItem(storageKey, JSON.stringify(savedTalks())); return true; }
+  try { localStorage.setItem(storageKey, JSON.stringify(savedTalks().map(personalSnapshot))); return true; }
   catch { state.storageAvailable = false; return false; }
 }
 function toggleSaved(id) {
@@ -54,12 +121,6 @@ function toggleSaved(id) {
   const persisted = persistSaved();
   renderPersonalPlan();
   if (restorePlanFocus) ($('#plan-results [data-action="save"]') || $('#plan-results [data-action="discover"]'))?.focus();
-  document.querySelectorAll('[data-action="save"]').forEach((button) => {
-    const saved = state.saved.has(button.dataset.id);
-    button.setAttribute('aria-pressed', String(saved));
-    button.setAttribute('aria-label', `${saved ? 'Remove' : 'Save'} ${findTalk(button.dataset.id)?.title || 'talk'}${saved ? ' from' : ' to'} my plan`);
-    if (button.classList.contains('dialog-save')) button.innerHTML = `${icon(saved ? 'check' : 'bookmark')} ${saved ? 'Saved to my plan' : 'Save to my plan'}`;
-  });
   if (!persisted) announce('Browser storage is unavailable. Your plan is saved for this visit only.');
   else announce(wasSaved ? 'Removed from your personal plan.' : 'Saved to your personal plan on this device.');
 }
@@ -124,6 +185,7 @@ function renderPersonalPlan() {
   warning.innerHTML = `${icon('alert')} ${conflicts.size} saved talks overlap. Keep them as options, or use Plan B to compare before you head out.`;
   $('#plan-results').innerHTML = talks.length ? groupedMarkup(talks, conflicts) : emptyMarkup('Make time for what interests you.', 'Save a session from Discover to start your itinerary. Your plan stays in this browser and can be exported to your calendar.', 'discover', 'Explore the schedule', 'bookmark');
   if (!state.storageAvailable) $('.device-note').innerHTML = `${icon('info')}<span>Browser storage unavailable. Saves last for this visit only.</span>`;
+  reconcileSaveControls();
 }
 
 function renderFacets(facets) {
@@ -146,6 +208,12 @@ function renderFacets(facets) {
   select.innerHTML = '<option value="">All tracks</option>' + [...new Set(facets.tracks || [])].sort().map((track) => `<option value="${escapeHtml(track)}">${escapeHtml(track)}</option>`).join('');
   select.value = state.filters.track;
 }
+function responseStatusMarkup(data) {
+  const mode = data.mode || 'unknown';
+  const status = data.degraded ? 'Limited service' : 'Connected catalog';
+  const reason = data.reason || (data.degraded ? (mode === 'snapshot' ? 'Using the offline schedule; live services are unavailable.' : 'Some services are unavailable. This response uses a fallback.') : '');
+  return `<div class="response-status"><p><strong>Mode: ${escapeHtml(mode)}</strong><span>${escapeHtml(status)}</span></p>${reason ? `<p>${escapeHtml(reason)}</p>` : ''}</div>`;
+}
 function updateNotice(data) {
   state.mode = data.mode;
   state.noticeData = data;
@@ -155,7 +223,8 @@ function updateNotice(data) {
   notice.classList.toggle('is-live', live && !data.degraded);
   $('#notice-icon').innerHTML = icon(live ? 'signal' : 'offline');
   $('#notice-title').textContent = snapshot ? 'Offline catalog · Live room signals unavailable' : data.degraded ? 'Search is running with limited connections' : live ? 'Conference catalog · Live crowd signals enabled' : 'Conference catalog · Live room signals unavailable';
-  $('#notice-description').textContent = snapshot ? 'Official schedule snapshot. Capacity figures are planning estimates, not venue data.' : data.degraded ? (data.reason || 'Some search or room services are unavailable. Results may use a fallback.') : live ? 'Crowd bookmarks and full-room reports are signals, not a headcount. Capacities are estimates.' : 'Explore the schedule and save your own plan. Capacity figures are planning estimates.';
+  const reason = data.reason || (snapshot ? 'Using the offline schedule. Capacities are planning estimates.' : data.degraded ? 'Some services are unavailable; results use a fallback.' : live ? 'Crowd signals indicate interest, not occupancy. Capacities are estimates.' : 'Explore the schedule and save your own plan. Capacities are estimates.');
+  $('#notice-description').textContent = `Mode: ${data.mode || 'unknown'} · ${data.degraded ? 'Limited service' : 'Connected catalog'}. ${reason}`;
   $('#available-filter').disabled = !live;
   $('#available-filter').parentElement.title = live ? 'Exclude talks flagged likely full from crowd signals.' : 'Requires live crowd signals. Missing signals are never treated as empty rooms.';
 }
@@ -164,6 +233,11 @@ function updateFilterUi() {
   $('#day-tabs').querySelectorAll('[data-day]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.day === state.filters.day)));
 }
 async function search({ append = false } = {}) {
+  const requestedFilters = { ...state.filters };
+  const requestedKey = filtersKey(requestedFilters);
+  // A delayed/programmatic append is never allowed to reuse another query's cursor.
+  if (append && (state.completedFilters !== requestedKey || state.nextOffset === null)) append = false;
+  const offset = append ? state.nextOffset : 0;
   clearTimeout(state.debounce);
   const sequence = ++state.searchSequence;
   state.searchController?.abort();
@@ -174,10 +248,12 @@ async function search({ append = false } = {}) {
   else { $('#load-more').disabled = true; $('#load-more').textContent = 'Loading more…'; }
   updateFilterUi();
   try {
-    const data = await api.search({ ...state.filters, offset: append ? state.nextOffset || 0 : 0 }, controller.signal);
+    const data = await api.search({ ...requestedFilters, offset }, controller.signal);
     if (sequence !== state.searchSequence) return;
     const items = Array.isArray(data.items) ? data.items.slice(0, 100) : [];
     items.forEach(cacheTalk);
+    if (items.some((talk) => state.saved.has(String(talk.id)))) renderPersonalPlan();
+    state.completedFilters = requestedKey;
     state.loaded = append ? [...state.loaded, ...items.filter((talk) => !state.loaded.some((previous) => previous.id === talk.id))] : items;
     state.total = data.total ?? state.loaded.length;
     state.nextOffset = Number.isInteger(data.next_offset) ? data.next_offset : null;
@@ -250,6 +326,7 @@ async function openDetails(id) {
     const talk = data.item;
     if (!talk) throw new Error('This talk is not in the current catalog.');
     cacheTalk(talk);
+    renderPersonalPlan();
     const saved = state.saved.has(String(talk.id));
     const sourceUrl = safeUrl(talk.source_url);
     const live = Boolean(state.config?.live_interactions) && data.mode !== 'snapshot';
@@ -261,15 +338,16 @@ async function openDetails(id) {
       <p class="dialog-speakers">${escapeHtml((talk.speakers || []).join(', ') || 'Speaker details not published')}</p>
       <div class="dialog-meta"><span>${icon('calendar')} ${escapeHtml(day(talk.start))}</span><span>${icon('clock')} ${escapeHtml(time(talk.start))}–${escapeHtml(time(talk.end))} MST</span><span>${icon('pin')} ${escapeHtml(talk.room || 'Room not published')}</span></div>
     </div><div class="dialog-body">
+      ${responseStatusMarkup(data)}
       <h3>About this session</h3><p class="abstract">${escapeHtml(talk.abstract || 'An abstract has not been published for this session.')}</p>
       ${talk.level ? `<p class="dialog-footnote">Session level: ${escapeHtml(talk.level)}</p>` : ''}
-      <div class="dialog-signals"><h3>Room signals</h3><div class="room-signal">${signalMarkup(talk)}</div>
-      <p>${full.signal === 'live' ? `${Number.isFinite(full.bookmarks) ? full.bookmarks : 'Unknown'} crowd bookmarks. ${Number.isFinite(full.reports) ? full.reports : 'Unknown'} full-room reports.` : 'Crowd bookmarks and full-room reports are unavailable, rather than zero.'}</p>
+      <div class="dialog-signals" data-talk-id="${escapeHtml(talk.id)}"><h3>Room signals</h3><div class="room-signal">${signalMarkup(talk)}</div>
+      <p class="signal-counts">${escapeHtml(signalCountsText(talk))}</p>
       <p class="signal-explanation">Capacity is a planning estimate, not a verified venue capacity. Crowd bookmarks are interest signals, not occupancy. Your personal plan does not contribute to crowd counts.</p></div>
       <div class="dialog-actions"><button class="button button-primary dialog-save" type="button" data-action="save" data-id="${escapeHtml(talk.id)}" aria-pressed="${saved}" aria-label="${saved ? 'Remove' : 'Save'} ${escapeHtml(talk.title)}${saved ? ' from' : ' to'} my plan">${icon(saved ? 'check' : 'bookmark')} ${saved ? 'Saved to my plan' : 'Save to my plan'}</button><button class="button button-secondary" type="button" data-action="planb" data-id="${escapeHtml(talk.id)}">${icon('route')} Find a Plan B</button></div>
       <p class="dialog-footnote">Saved only on this device. A personal save does not reserve a seat.</p>
       ${sourceUrl ? `<a class="dialog-source" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">View official session ${icon('external')}</a>` : '<p class="dialog-footnote">An official session link is not available.</p>'}
-      ${live ? `<section class="live-actions"><h3>Help fellow attendees</h3><p>Live actions are separate from your device-only plan. Report only what you observe at the room.</p><div class="live-actions-buttons"><button class="button button-secondary" type="button" data-action="report-full" data-id="${escapeHtml(talk.id)}">${icon('alert')} Report room full</button><button class="button button-secondary" type="button" data-action="subscribe" data-id="${escapeHtml(talk.id)}">${icon('bell')} Check room alerts</button></div><p id="live-feedback" class="live-feedback" role="status"></p></section>` : ''}
+      ${live ? `<section class="live-actions"><h3>Help fellow attendees</h3><p>Share interest as a live crowd signal, separate from your personal plan. Interest is not a reservation or a headcount. Report a full room only when you observe it.</p><div class="live-actions-buttons"><button class="button button-secondary interest-button" type="button" data-action="share-interest" data-id="${escapeHtml(talk.id)}" aria-pressed="${state.sharedInterest.has(String(talk.id))}">${icon(state.sharedInterest.has(String(talk.id)) ? 'check' : 'signal')} ${state.sharedInterest.has(String(talk.id)) ? 'Withdraw interest' : 'Share interest'}</button><button class="button button-secondary" type="button" data-action="report-full" data-id="${escapeHtml(talk.id)}">${icon('alert')} Report room full</button><button class="button button-secondary" type="button" data-action="subscribe" data-id="${escapeHtml(talk.id)}">${icon('bell')} Check room alerts</button></div><p id="live-feedback" class="live-feedback" role="status"></p></section>` : ''}
     </div>`;
     $('.dialog-close').focus();
   } catch (error) { if (error.name !== 'AbortError' && sequence === state.dialogSequence) renderDialogError(error.message, 'details', id); }
@@ -284,20 +362,29 @@ async function openPlanB(id) {
     const items = (Array.isArray(data.items) ? data.items : []).slice(0, 3);
     items.forEach(cacheTalk);
     if (source) cacheTalk(source);
+    renderPersonalPlan();
     $('#dialog-content').innerHTML = `<div class="dialog-header">
       <button class="dialog-close" data-action="close-dialog" aria-label="Close Plan B" type="button">${icon('close')}</button>
       <button class="back-button" data-action="details" data-id="${escapeHtml(id)}" type="button">${icon('back')} Back to session</button>
       <h2 id="dialog-title">Another room. A new idea.</h2>
       <p class="dialog-subheading">Plan B for <strong>${escapeHtml(source?.title || 'your session')}</strong>${source ? `, ${escapeHtml(time(source.start))} on ${escapeHtml(day(source.start, true))}` : ''}.</p>
     </div><div class="dialog-body">
+      ${responseStatusMarkup(data)}
       <p class="planb-note">Starting within 10 minutes, in a different room. Nearby floors are preferred when known; check the venue before walking. ${data.mode === 'snapshot' || data.degraded ? 'Live room signals are unavailable for some or all options. A seat is not guaranteed.' : 'Crowd signals are estimates. A seat is not guaranteed.'}</p>
-      <div class="planb-list">${items.length ? items.map((talk) => rowMarkup(talk, { alternative: true })).join('') : emptyMarkup('No good backup in this window.', data.reason || 'There are no eligible sessions starting within 10 minutes in another room. Try exploring a different time in the schedule.', '', '', 'route')}</div>
+      <div class="planb-list">${items.length ? items.map((talk) => rowMarkup(talk, { alternative: true })).join('') : emptyMarkup('No good backup in this window.', 'There are no eligible sessions starting within 10 minutes in another room. Try exploring a different time in the schedule.', '', '', 'route')}</div>
       <p class="dialog-footnote">${data.mode === 'snapshot' ? 'Offline catalog. ' : ''}Unknown room signals remain eligible and are labeled. Unknown floors never count as a floor match.</p>
     </div>`;
     $('.dialog-close').focus();
   } catch (error) { if (error.name !== 'AbortError' && sequence === state.dialogSequence) renderDialogError(error.message, 'planb', id); }
 }
 function closeDialog() { $('#talk-dialog').close(); }
+function restoreDialogFocus() {
+  if (state.lastFocus?.isConnected && !state.lastFocus.closest('[hidden]')) { state.lastFocus.focus(); return; }
+  const target = state.view === 'plan'
+    ? $('#plan-results [data-action="details"]') || $('#plan-results [data-action="discover"]') || $('[data-view="plan"]')
+    : $('#talk-results [data-action="details"]') || $('#search-input');
+  target?.focus();
+}
 function attendeeId() {
   const key = 'overflow.attendee.v1';
   try {
@@ -311,7 +398,19 @@ async function liveAction(button, type, id) {
   const feedback = $('#live-feedback');
   try {
     const attendee_id = attendeeId();
-    if (type === 'report-full') {
+    if (type === 'share-interest') {
+      const shared = state.sharedInterest.has(String(id));
+      await api.interaction({ talk_id: id, attendee_id, type: shared ? 'unbookmark' : 'bookmark' });
+      // This receipt changes only after the server accepts the write. Counts come from a fresh response.
+      if (shared) state.sharedInterest.delete(String(id)); else state.sharedInterest.add(String(id));
+      try { localStorage.setItem(interestStorageKey, JSON.stringify([...state.sharedInterest])); } catch { /* Receipt remains available for this visit. */ }
+      reconcileInterestControls();
+      const message = shared ? 'Interest withdrawn from live crowd signals.' : 'Interest shared with live crowd signals. Your personal plan is unchanged.';
+      if (feedback?.isConnected) feedback.textContent = message;
+      announce(message);
+      try { const data = await api.talk(id); if (data.item) refreshRoomSignals(data.item); }
+      catch { if (feedback?.isConnected) feedback.textContent = `${message} Room counts could not refresh; reopen this session to try again.`; }
+    } else if (type === 'report-full') {
       await api.interaction({ talk_id: id, attendee_id, type: 'full_report' });
       if (feedback?.isConnected) feedback.textContent = 'Full-room report sent. Thank you for sharing what you observed.';
       announce('Full-room report sent.');
@@ -362,6 +461,7 @@ function initEvents() {
     clearTimeout(state.debounce);
     // Invalidate the previous response immediately, including during the debounce window.
     state.searchSequence++; state.searchController?.abort();
+    invalidatePagination();
     state.debounce = setTimeout(search, 260);
   });
   $('#day-tabs').addEventListener('click', (event) => { const button = event.target.closest('[data-day]'); if (button) { state.filters.day = button.dataset.day; search(); } });
@@ -384,26 +484,29 @@ function initEvents() {
     else if (action === 'reset') resetFilters();
     else if (action === 'retry') search();
     else if (action === 'discover') switchView('discover', { focus: true });
-    else if (action === 'report-full' || action === 'subscribe') liveAction(button, action, id);
+    else if (action === 'report-full' || action === 'subscribe' || action === 'share-interest') liveAction(button, action, id);
   });
   const dialog = $('#talk-dialog');
   dialog.addEventListener('click', (event) => { if (event.target === dialog) { const rect = dialog.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) closeDialog(); } });
-  dialog.addEventListener('close', () => { state.dialogSequence++; state.dialogController?.abort(); if (state.lastFocus?.isConnected) state.lastFocus.focus(); });
+  dialog.addEventListener('close', () => { state.dialogSequence++; state.dialogController?.abort(); restoreDialogFocus(); });
   document.addEventListener('keydown', (event) => {
     if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !dialog.open && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) && !document.activeElement?.isContentEditable) {
       event.preventDefault(); switchView('discover'); $('#search-input').focus();
     }
   });
   window.addEventListener('hashchange', () => switchView(location.hash === '#plan' ? 'plan' : 'discover'));
-  window.addEventListener('storage', (event) => { if (event.key === storageKey) { state.saved.clear(); loadSaved(); renderPersonalPlan(); } });
+  window.addEventListener('storage', (event) => {
+    if (event.key === storageKey || event.key === null) { state.saved.clear(); loadSaved(); renderPersonalPlan(); }
+    if (event.key === interestStorageKey || event.key === null) { loadSharedInterest(); reconcileInterestControls(); }
+  });
 }
 
 async function init() {
-  initIcons(); loadSaved(); renderPersonalPlan(); initEvents();
+  initIcons(); loadSaved(); loadSharedInterest(); renderPersonalPlan(); initEvents();
   switchView(location.hash === '#plan' ? 'plan' : 'discover');
   const configPromise = api.config().then((config) => { state.config = config; if (state.mode) updateNotice(state.noticeData); }).catch(() => { state.config = { live_interactions: false }; });
   // Health is informative, never a gate that prevents reading the schedule.
-  const statusPromise = api.status().then((status) => { $('#catalog-notice').dataset.serviceStatus = status.status; }).catch(() => {});
+  const statusPromise = api.status().then(renderServiceHealth).catch(() => renderServiceHealth({ status: 'unavailable' }));
   await Promise.allSettled([configPromise, statusPromise, search()]);
 }
 init();

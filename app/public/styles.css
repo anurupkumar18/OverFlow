@@ -1790,3 +1790,128 @@ body:has(dialog[open]) {
 .day-tabs button,.planb-button {
   min-height:44px
 }
+.response-status {
+  border-bottom:1px solid var(--line);
+  padding-bottom:15px;
+  margin:0 0 22px;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.7;
+}
+.response-status p {
+  margin:0;
+}
+.response-status p:first-child {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 12px;
+}
+.response-status strong {
+  font-weight:600;
+}
+
+/* Keep discovery within reach on a conference-day screen. */
+.hero {
+  padding:18px 40px;
+  min-height:220px;
+  margin-bottom:24px;
+}
+.hero h1 {
+  font-size:46px;
+  letter-spacing:-2.3px;
+  margin-bottom:12px;
+}
+.event-name {
+  margin-bottom:10px;
+}
+.hero-description {
+  margin-bottom:10px;
+}
+.hero-route {
+  width:30%;
+  max-width:280px;
+  margin-top:0;
+}
+.results-heading {
+  margin-top:16px;
+}
+.result-context {
+  margin-bottom:9px;
+}
+.talk-group-label {
+  margin-top:14px;
+}
+@media(max-width:700px) {
+  .hero {
+    padding:18px 24px;
+    min-height:0;
+    margin-bottom:20px;
+  }
+  .hero h1 {
+    font-size:38px;
+    letter-spacing:-1.8px;
+    margin-bottom:10px;
+  }
+  .event-name {
+    margin-bottom:10px;
+  }
+  .hero-description {
+    font-size:12px;
+    line-height:1.5;
+    margin-bottom:10px;
+  }
+  .hero-route {
+    margin-top:0;
+  }
+  .catalog-notice {
+    margin-bottom:14px;
+    padding:10px 14px;
+  }
+  .search-form {
+    margin-bottom:14px;
+  }
+  .secondary-filters {
+    margin-top:5px;
+    padding-bottom:9px;
+  }
+  .results-heading {
+    margin-top:17px;
+  }
+  .result-context {
+    margin-bottom:10px;
+  }
+}
+.service-health {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:10px;
+  color:var(--muted);
+  line-height:1.6;
+}
+.service-health::before {
+  content:"";
+  width:5px;
+  height:5px;
+  border-radius:50%;
+  background:#9aa28d;
+  flex:none;
+}
+.service-health.has-metrics::before {
+  background:var(--sea);
+}
+@media(max-width:1100px) {
+  .site-footer>p {
+    display:none;
+  }
+}
+@media(max-width:700px) {
+  .site-footer {
+    flex-wrap:wrap;
+    gap:8px 14px;
+  }
+  .service-health {
+    order:3;
+    width:100%;
+  }
+}

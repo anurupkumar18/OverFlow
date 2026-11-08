@@ -18,6 +18,7 @@ Open [localhost:8080](http://localhost:8080). No credentials required. Search an
 ```sh
 npm --prefix app test
 node --test scripts/telemetry.test.cjs scripts/status-provider.test.cjs
+node scripts/ui-state-check.cjs
 node scripts/otlp-smoke.cjs
 python3 -m unittest discover -s scripts/tests -v
 python3 scripts/smoke.py http://127.0.0.1:8080
@@ -33,6 +34,7 @@ For the host-timezone checks, run the Node suite with `TZ=UTC`, `TZ=America/Denv
 - Cloud search modes degrade explicitly through reranked hybrid, hybrid, BM25 and snapshot. A mode label describes the query actually executed.
 - Capacities are a **uniform estimate of 200**, not venue measurements. Every fullness value carries its denominator and `capacity_source: estimate`.
 - Without live interactions, room counts are unknown, not zero. Snapshot alternatives are not guaranteed to have space.
+- When live services are connected, Share interest and Withdraw interest explicitly contribute to crowd counts; these actions are separate from private saved talks. Counts update only from the server response.
 - With verified Elasticsearch interaction data, the heuristic marks likely full at bookmarks/capacity ≥1, or two distinct recent full reports within 10 minutes. Smoke identities are excluded.
 
 The [official schedule](https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/program/schedule/) links a public Sessionize API. The source contained 600 entries; 480 had speakers, abstract, room and times; excluding 10 simultaneous poster entries left 470. These are measured catalog counts, not attendance statistics. See [data provenance](app/data/SOURCE.md) for scope and timestamp conversion.
@@ -78,7 +80,7 @@ The original Kubernetes/Argo CD starter is retained. Team/repository placeholder
 
 ## Accessibility
 
-Semantic landmarks, labeled inputs, native dialogs, keyboard focus, status announcements, text room-status labels, minimum 44px controls, and reduced-motion styles are part of the UI. Responsiveness and agent-operated browser QA are recorded in `docs/qa.md` when complete. This does not substitute for a human assistive-technology evaluation.
+Semantic landmarks, labeled inputs, native dialogs, keyboard focus, status announcements, text room-status labels, minimum 44px controls, and reduced-motion styles are part of the UI. Responsiveness and agent-operated browser QA are recorded in [QA evidence](docs/qa.md). This does not substitute for a human assistive-technology evaluation.
 
 ## Evaluation and judging evidence
 

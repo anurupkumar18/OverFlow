@@ -23,6 +23,7 @@ jobs:
       - run: npm ci --prefix app
       - run: npm --prefix app test
       - run: node --test scripts/telemetry.test.cjs scripts/status-provider.test.cjs
+      - run: node scripts/ui-state-check.cjs
       - run: node scripts/otlp-smoke.cjs
   data:
     runs-on: ubuntu-latest
