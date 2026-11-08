@@ -3,6 +3,7 @@ import argparse
 import csv
 import json
 import math
+import re
 from pathlib import Path
 import sys
 
@@ -21,6 +22,12 @@ def check(report, baseline):
     score = baseline.get('mrr')
     if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 1:
         raise ValueError('baseline MRR must be measured in [0,1]')
+    current, previous = report.get('evidence'), baseline.get('evidence')
+    keys = ('queries_sha256', 'labels_sha256', 'corpus_sha256', 'ranking_config_sha256')
+    complete = lambda value: isinstance(value, dict) and all(isinstance(value.get(key), str) and re.fullmatch('[0-9a-f]{64}', value[key]) for key in keys)
+    if (not complete(current) or not complete(previous) or any(current[key] != previous[key] for key in keys)
+            or baseline['n'] != report['n'] or sorted(baseline.get('eligible_query_ids', [])) != sorted(report['eligible_query_ids'])):
+        return dict(status='not_evaluated', reason='Baseline and current evidence lack an identical eligible query cohort, wording, labels, corpus, or ranking configuration.', n=report['n'])
     actual = report['arms'][baseline['arm']]['mrr']
     return dict(status='passed' if actual >= score - .05 else 'failed', n=report['n'], arm=baseline['arm'],
                 measured_mrr=actual, baseline_mrr=score, allowed_drop=.05)

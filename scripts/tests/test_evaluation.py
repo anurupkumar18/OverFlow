@@ -106,9 +106,33 @@ class EvaluationTests(unittest.TestCase):
         except ModuleNotFoundError:
             self.fail('honest evaluation gate is not implemented')
         labels = [dict(query_id='q1', talk_id=t, label='1' if t == 'a' else '0', label_source='human') for t in ['a', 'b', 'c']]
-        report = self.module().evaluate(runs(), labels)
-        self.assertEqual(gate.check(report, dict(arm='hybrid', mrr=.6, n=1, label_source='human', approved=True))['status'], 'failed')
-        self.assertEqual(gate.check(report, dict(arm='hybrid', mrr=.5, n=1, label_source='human', approved=True))['status'], 'passed')
+        payload = runs()
+        payload.update(corpus_sha256='a' * 64, ranking_config_sha256='b' * 64)
+        report = self.module().evaluate(payload, labels)
+        baseline = dict(arm='hybrid', mrr=.6, n=1, label_source='human', approved=True,
+                        eligible_query_ids=report['eligible_query_ids'], evidence=report.get('evidence'))
+        self.assertEqual(gate.check(report, baseline)['status'], 'failed')
+        baseline['mrr'] = .5
+        self.assertEqual(gate.check(report, baseline)['status'], 'passed')
+
+    def test_gate_refuses_incomparable_query_labels_corpus_and_ranking(self):
+        gate = importlib.import_module('eval.gate')
+        payload = runs()
+        payload.update(corpus_sha256='a' * 64, ranking_config_sha256='b' * 64)
+        labels = [dict(query_id='q1', talk_id=t, label='1' if t == 'a' else '0', label_source='human') for t in ['a', 'b', 'c']]
+        report = self.module().evaluate(payload, labels)
+        baseline = dict(arm='hybrid', mrr=.5, n=1, label_source='human', approved=True,
+                        eligible_query_ids=report['eligible_query_ids'], evidence=report.get('evidence'))
+        import copy
+        for field in ['queries_sha256', 'labels_sha256', 'corpus_sha256', 'ranking_config_sha256']:
+            mismatched = copy.deepcopy(baseline)
+            mismatched['evidence'] = dict(mismatched.get('evidence') or {}, **{field: 'c' * 64})
+            self.assertEqual(gate.check(report, mismatched)['status'], 'not_evaluated', field)
+        mismatched = dict(baseline, n=99, eligible_query_ids=['q-old'])
+        self.assertEqual(gate.check(report, mismatched)['status'], 'not_evaluated')
+        missing = dict(baseline)
+        missing.pop('evidence')
+        self.assertEqual(gate.check(report, missing)['status'], 'not_evaluated')
 
     def test_p95_uses_nearest_rank_on_eligible_query_samples(self):
         payload = dict(queries=[dict(id='q' + str(i), text='approved fixture') for i in range(20)], runs=[])
@@ -139,6 +163,29 @@ class EvaluationTests(unittest.TestCase):
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 1)
             self.assertEqual(json.loads(result.stdout)['status'], 'invalid_evidence')
+
+    def test_provider_identity_changes_with_corpus_or_runtime_config(self):
+        pool = importlib.import_module('eval.pool')
+        class Provider:
+            title = 'Actual indexed talk'
+            analyzer = 'standard'
+            def request(self, method, path, body=None):
+                if path == '/talks/_search':
+                    return {'hits': {'total': {'value': 1}, 'hits': [{'_id': 'a', '_source': {'id': 'a', 'title': self.title}}]}}
+                if path == '/talks/_mapping':
+                    return {'talks': {'mappings': {'properties': {'semantic_text': {'inference_id': 'existing-embedding'}}}}}
+                if path.startswith('/talks/_settings'):
+                    return {'talks': {'settings': {'analysis': self.analyzer}}}
+                if path == '/_synonyms/overflow-synonyms':
+                    return {'synonyms_set': [{'id': 'k8s', 'synonyms': 'k8s,kubernetes'}]}
+                raise AssertionError(path)
+        provider = Provider()
+        original = pool.provider_evidence(provider, 'reranker', {})
+        self.assertEqual(original, pool.provider_evidence(provider, 'reranker', {}))
+        provider.title = 'Changed indexed talk'
+        self.assertNotEqual(original['corpus_sha256'], pool.provider_evidence(provider, 'reranker', {})['corpus_sha256'])
+        provider.analyzer = 'different'
+        self.assertNotEqual(original['ranking_config_sha256'], pool.provider_evidence(provider, 'reranker', {})['ranking_config_sha256'])
 
 
 if __name__ == '__main__':

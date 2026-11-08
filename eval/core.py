@@ -1,9 +1,14 @@
 """Blind pooling and honest metrics on complete human-judged query pools."""
 import hashlib
+import json
 import math
 import random
 
 ARMS = ('bm25', 'semantic', 'hybrid', 'hybrid_rerank')
+
+
+def fingerprint(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
 
 
 def validate_runs(payload):
@@ -90,6 +95,10 @@ def evaluate(payload, labels):
                          mrr=sum(reciprocal) / len(reciprocal) if reciprocal else None,
                          p95_ms=sorted(elapsed)[math.ceil(.95 * len(elapsed)) - 1] if elapsed else None,
                          latency_samples=len(elapsed), unjudged_results_at_10=unknown)
-    return dict(n=len(eligible), total_queries=len(queries), eligible_query_ids=eligible,
+    cohort = set(eligible)
+    evidence = dict(queries_sha256=fingerprint(sorted((q['id'], q['text']) for q in queries if q['id'] in cohort)),
+                    labels_sha256=fingerprint(sorted((qid, talk, label) for (qid, talk), label in judged.items() if qid in cohort)),
+                    corpus_sha256=payload.get('corpus_sha256'), ranking_config_sha256=payload.get('ranking_config_sha256'))
+    return dict(n=len(eligible), total_queries=len(queries), eligible_query_ids=eligible, evidence=evidence,
                 excluded_incomplete=incomplete, excluded_failed=failed, excluded_no_relevant=no_relevant, arms=arms,
                 interpretation='Recall@10 uses relevant documents in the top-5-per-arm judged pool, not corpus-wide recall. MRR is truncated at 10 and uses judged relevant items; unjudged results stay unknown. Complete human query pools and successful runs for all four arms are required; queries with no judged relevant items are excluded. Latency is client-observed per request, nearest-rank p95 on included queries only.')

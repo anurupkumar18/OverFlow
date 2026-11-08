@@ -1,4 +1,7 @@
 import importlib
+import json
+from pathlib import Path
+import subprocess
 import unittest
 
 
@@ -31,8 +34,8 @@ class ElasticToolingTests(unittest.TestCase):
     def test_search_bodies_keep_four_distinct_arms_and_require_real_reranker(self):
         tool = self.module()
         lexical = tool.search_body('bm25', 'otel')
-        self.assertIn('multi_match', lexical['retriever']['standard']['query'])
-        self.assertIn('semantic', tool.search_body('semantic', 'otel')['retriever']['standard']['query'])
+        self.assertEqual(lexical['query']['bool']['must'][0]['multi_match']['operator'], 'and')
+        self.assertIn('semantic', tool.search_body('semantic', 'otel')['retriever']['standard']['query']['bool']['must'][0])
         self.assertIn('rrf', tool.search_body('hybrid', 'otel')['retriever'])
         with self.assertRaises(ValueError):
             tool.search_body('hybrid_rerank', 'otel')
@@ -42,6 +45,18 @@ class ElasticToolingTests(unittest.TestCase):
     def test_cleartext_remote_urls_are_rejected_before_secrets_are_sent(self):
         with self.assertRaises(ValueError):
             self.module().Client({'ES_URL': 'http://remote.invalid', 'ES_API_KEY': 'fake'})
+
+    def test_eval_requests_match_runtime_retrieval_semantics(self):
+        tool = self.module()
+        root = Path(__file__).resolve().parents[2]
+        for filters, full_ids in [({'q': 'otel production'}, []),
+                                  ({'q': 'otel production', 'day': '2026-11-10', 'track': 'Observability', 'available': True}, ['full'])]:
+            script = "const fs=require('node:fs');const {Elasticsearch}=require('./app/src/elasticsearch');const x=JSON.parse(fs.readFileSync(0,'utf8'));const engine=new Elasticsearch({env:{ES_URL:'https://example.invalid',ES_RERANK_INFERENCE_ID:'existing-rerank'}});console.log(JSON.stringify(Object.fromEntries(['bm25','hybrid','hybrid_rerank'].map(mode=>[mode,engine.buildSearch(mode,x.filters,x.full_ids)]))));"
+            response = subprocess.run(['node', '-e', script], input=json.dumps(dict(filters=filters, full_ids=full_ids)), cwd=root,
+                                      capture_output=True, text=True, check=True)
+            runtime = json.loads(response.stdout)
+            for arm, expected in runtime.items():
+                self.assertEqual(tool.search_body(arm, filters['q'], 'existing-rerank', filters=filters, full_ids=full_ids), expected, arm)
 
 
 if __name__ == '__main__':

@@ -8,7 +8,7 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from eval.core import ARMS, pool_rows
+from eval.core import ARMS, fingerprint, pool_rows
 from scripts.ingest.elastic import Client, ElasticError, read_env, search_body, select_inference
 
 
@@ -35,13 +35,31 @@ def collect(queries, client, rerank_id=None):
                 response = client.request('POST', '/talks/_search', body)
                 if response.get('timed_out') or response.get('_shards', {}).get('failed', 0):
                     raise ElasticError('incomplete search')
-                ids = [hit.get('_source', {}).get('id', hit['_id']) for hit in response['hits']['hits']]
+                ids = [hit.get('_source', {}).get('id', hit['_id']) for hit in response['hits']['hits'][:10]]
                 payload['runs'].append(dict(query_id=query['id'], arm=arm, ids=ids,
                                             elapsed_ms=(time.perf_counter() - start) * 1000, status='ok'))
             except (ElasticError, ValueError, KeyError):
                 payload['runs'].append(dict(query_id=query['id'], arm=arm, ids=[], elapsed_ms=None, status='error',
                                             reason='arm unavailable; no replacement arm or fabricated result'))
     return payload
+
+
+def provider_evidence(client, rerank_id, endpoints):
+    """Fingerprint actual indexed corpus/config; never save raw provider metadata."""
+    corpus = client.request('POST', '/talks/_search', {'size': 1000, 'track_total_hits': True,
+                            'query': {'match_all': {}}, 'sort': [{'id': 'asc'}], '_source': {'excludes': ['semantic_text']}})
+    hits = corpus['hits']['hits']
+    total = corpus['hits']['total']
+    total = total['value'] if isinstance(total, dict) else total
+    if corpus.get('timed_out') or corpus.get('_shards', {}).get('failed', 0) or total != len(hits):
+        raise ValueError('complete stable corpus fingerprint unavailable within 1000-talk bound')
+    documents = sorted((hit['_id'], hit['_source']) for hit in hits)
+    mapping = client.request('GET', '/talks/_mapping')
+    settings = client.request('GET', '/talks/_settings?flat_settings=true&include_defaults=false')
+    synonyms = client.request('GET', '/_synonyms/overflow-synonyms')
+    requests = {arm: search_body(arm, '__query__', rerank_id) for arm in ARMS if arm != 'hybrid_rerank' or rerank_id}
+    return dict(corpus_sha256=fingerprint(documents), ranking_config_sha256=fingerprint(dict(
+                requests=requests, mapping=mapping, settings=settings, synonyms=synonyms, inference=endpoints)))
 
 
 def main():
@@ -71,7 +89,20 @@ def main():
                 rerank = select_inference(endpoints, values.get('ES_RERANK_INFERENCE_ID'), task='rerank')
             except ValueError:
                 rerank = None
+            try:
+                before = provider_evidence(client, rerank, endpoints)
+            except (ElasticError, ValueError, KeyError):
+                before = None
             payload = collect(queries, client, rerank)
+            try:
+                after = provider_evidence(client, rerank, client.request('GET', '/_inference'))
+            except (ElasticError, ValueError, KeyError):
+                after = None
+            if before is not None and before == after:
+                payload.update(before, evidence_status='provider corpus and ranking configuration stable before/after collection')
+            else:
+                payload.update(corpus_sha256=None, ranking_config_sha256=None,
+                               evidence_status='provider corpus/configuration identity missing or changed; regression comparison not evaluated')
         catalog = {t['id']: t for t in json.loads(args.catalog.read_text())['talks']}
         rows = pool_rows(payload, catalog)
         args.output.parent.mkdir(parents=True, exist_ok=True)

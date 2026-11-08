@@ -1,5 +1,6 @@
 """Bounded Elasticsearch HTTP, explicit inference discovery and index setup."""
 import argparse
+import datetime as dt
 import json
 from pathlib import Path
 import urllib.error
@@ -98,12 +99,31 @@ def schemas(inference_id):
     }
 
 
-def search_body(arm, text, rerank_id=None):
-    lexical = {'standard': {'query': {'multi_match': {'query': text, 'fields': ['title^3', 'abstract', 'speakers^2', 'tags^2', 'track']}}}}
-    semantic = {'standard': {'query': {'semantic': {'field': 'semantic_text', 'query': text}}}}
-    hybrid = {'rrf': {'retrievers': [lexical, semantic], 'rank_window_size': 20, 'rank_constant': 60}}
+def search_body(arm, text, rerank_id=None, filters=None, full_ids=None):
+    """Match runtime buildSearch semantics; collector retains only top 10 IDs."""
+    from .catalog import utc
+    filters = filters or {}
+    filter_clauses = []
+    if filters.get('day'):
+        day = dt.date.fromisoformat(filters['day'])
+        filter_clauses.append({'range': {'start': {'gte': utc(day.isoformat() + 'T00:00:00').replace('Z', '.000Z'),
+                                                 'lt': utc((day + dt.timedelta(days=1)).isoformat() + 'T00:00:00').replace('Z', '.000Z')}}})
+    if filters.get('track'):
+        filter_clauses.append({'term': {'track': filters['track']}})
+    common = {'filter': filter_clauses}
+    if filters.get('available') and full_ids:
+        common['must_not'] = [{'terms': {'id': full_ids}}]
+    query = {'bool': {'must': [{'multi_match': {'query': text, 'fields': ['title^3', 'abstract', 'speakers^2', 'tags^2', 'track'],
+                                               'type': 'best_fields', 'operator': 'and'}}] if text else [{'match_all': {}}], **common}}
+    lexical = {'standard': {'query': query}}
+    semantic = {'standard': {'query': {'bool': {'must': [{'semantic': {'field': 'semantic_text', 'query': text}}], **common}}}}
+    offset = filters.get('offset', 0)
+    base = {'size': 100, 'from': offset, 'track_total_hits': True, '_source': {'excludes': ['semantic_text']}}
+    if not text:
+        return {**base, 'query': query, 'sort': [{'start': 'asc'}, {'id': 'asc'}]}
+    hybrid = {'rrf': {'retrievers': [lexical, semantic], 'rank_window_size': 100 + offset, 'rank_constant': 60}}
     if arm == 'bm25':
-        retriever = lexical
+        return {**base, 'query': query}
     elif arm == 'semantic':
         retriever = semantic
     elif arm == 'hybrid':
@@ -113,7 +133,7 @@ def search_body(arm, text, rerank_id=None):
                                                 'inference_text': text, 'rank_window_size': 20}}
     else:
         raise ValueError('unknown arm or missing verified reranker')
-    return {'size': 10, '_source': ['id'], 'retriever': retriever}
+    return {**base, **({'size': 20} if arm == 'hybrid_rerank' else {}), 'retriever': retriever}
 
 
 def main():

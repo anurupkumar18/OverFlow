@@ -2,6 +2,12 @@
   "n": 0,
   "total_queries": 0,
   "eligible_query_ids": [],
+  "evidence": {
+    "queries_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "labels_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "corpus_sha256": null,
+    "ranking_config_sha256": null
+  },
   "excluded_incomplete": [],
   "excluded_failed": [],
   "excluded_no_relevant": [],
