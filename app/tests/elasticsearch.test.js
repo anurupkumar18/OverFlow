@@ -5,7 +5,7 @@ function fixture({mode='hybrid_rerank',failModes=[],crowd=[],clock=()=>Date.pars
  const calls=[];let setting=mode;
  const fetchImpl=async(url,options={})=>{const p=new URL(url).pathname;const body=options.body?JSON.parse(options.body):null;calls.push({path:p,body,method:options.method});
   if(p==='/overflow_settings/_doc/search')return Response.json({_source:{mode:setting}});
-  if(p==='/interactions/_search')return Response.json({aggregations:{talks:{buckets:crowd}}});
+  if(p==='/interactions/_search')return Response.json({timed_out:false,_shards:{total:1,successful:1,skipped:0,failed:0},aggregations:{talks:{doc_count_error_upper_bound:0,sum_other_doc_count:0,buckets:crowd}}});
   if(p==='/talks/_search'){const actual=body.retriever?.text_similarity_reranker?'hybrid_rerank':body.retriever?.rrf?'hybrid':'bm25';if(failModes.includes(actual))return Response.json({error:'provider secret'},{status:400});return Response.json({hits:{total:{value:101,relation:'eq'},hits:[{_id:'a',_source:talk}]}});}
   return Response.json({result:'created'});
  };
@@ -25,7 +25,7 @@ test('results expire at 60 seconds and runtime mode settings refresh within 10 s
  now+=60001;await f.es.searchTalks({q:'a'},[talk]);assert.equal(f.calls.filter(c=>c.path==='/talks/_search').length,3);
 });
 test('fullness uses the capacity denominator and exactly two recent unique reports imply full',async()=>{
- const buckets=[{key:'a',bookmarks:{doc_count:180},reports:{doc_count:2}}];const {es,calls}=fixture({mode:'bm25',crowd:buckets});
+ const buckets=[{key:'a',doc_count:182,bookmarks:{doc_count:180},reports:{doc_count:2}}];const {es,calls}=fixture({mode:'bm25',crowd:buckets});
  const result=await es.searchTalks({q:'Kubernetes'},[talk]);
  assert.equal(result.items[0].fullness.pressure,0.9);assert.equal(result.items[0].fullness.reports,2);assert.equal(result.items[0].fullness.likely_full,true);
  const crowd=calls.find(c=>c.path==='/interactions/_search').body;assert.deepEqual(crowd.query.bool.must_not,[{prefix:{attendee_id:'smoke-'}}]);
@@ -63,3 +63,27 @@ test('Elasticsearch credentials cannot be sent to public plaintext or embedded-a
  assert.throws(()=>new Elasticsearch({env:{ES_URL:'https://user:password@elastic.example'}}),/Invalid Elasticsearch URL/);
  assert.doesNotThrow(()=>new Elasticsearch({env:{ES_URL:'http://127.0.0.1:9200'}}));
 });
+
+const completeCrowd = buckets => ({timed_out:false,_shards:{total:1,successful:1,skipped:0,failed:0},aggregations:{talks:{doc_count_error_upper_bound:0,sum_other_doc_count:0,buckets}}});
+const badCrowdResponses = [
+ ['timed-out empty aggregation',{...completeCrowd([]),timed_out:true}],
+ ['failed shard empty aggregation',{...completeCrowd([]),_shards:{total:2,successful:1,skipped:0,failed:1}}],
+ ['truncated terms aggregation',{...completeCrowd([]),aggregations:{talks:{doc_count_error_upper_bound:0,sum_other_doc_count:1,buckets:[]}}}],
+ ['missing bucket counts',completeCrowd([{key:'a',doc_count:1,bookmarks:{},reports:{doc_count:0}}])],
+ ['negative bucket counts',completeCrowd([{key:'a',doc_count:1,bookmarks:{doc_count:-1},reports:{doc_count:0}}])],
+ ['string bucket counts',completeCrowd([{key:'a',doc_count:1,bookmarks:{doc_count:'0'},reports:{doc_count:0}}])],
+];
+for (const [name,crowd] of badCrowdResponses) {
+ test(name+' stays unknown and disclosed in search and Plan B',async()=>{
+  const es=new Elasticsearch({env:{ES_URL:'https://elastic.test',SEARCH_MODE:'bm25'},fetchImpl:async(url)=>{
+   const path=new URL(url).pathname;
+   if(path==='/overflow_settings/_doc/search')return Response.json({_source:{mode:'bm25'}});
+   if(path==='/interactions/_search')return Response.json(crowd);
+   return Response.json({timed_out:false,_shards:{failed:0},hits:{total:{value:1},hits:[{_source:talk}]}});
+  }});
+  const search=await es.searchTalks({q:'Kubernetes',available:true},[talk]);
+  assert.equal(search.items[0].fullness.bookmarks,null);assert.equal(search.items[0].fullness.reports,null);
+  assert.equal(search.items[0].fullness.likely_full,null);assert.equal(search.items[0].fullness.signal,'unavailable');assert.equal(search.degraded,true);assert.match(search.reason,/unknown|unavailable/i);
+  const candidates=await es.planBCandidates(talk);assert.equal(candidates.items[0].fullness.signal,'unavailable');assert.equal(candidates.items[0].fullness.likely_full,null);assert.equal(candidates.degraded,true);assert.match(candidates.reason,/unavailable/i);
+ });
+}

@@ -22,6 +22,12 @@ function searchFilters(url) {
  if(!/^\d{1,4}$/.test(offsetValue)||Number(offsetValue)>1000)throw new HttpError(400,'Invalid offset; use an integer from 0 to 1000.');
  return {q:q.trim(),day,track,available:available==='true',offset:Number(offsetValue)};
 }
+function verifiedStatus(status) {
+ return status?.status === 'available' &&
+  Number.isFinite(status.p95_ms) && status.p95_ms >= 0 &&
+  [status.error_ratio, status.degraded_share].every(value => Number.isFinite(value) && value >= 0 && value <= 1) &&
+  typeof status.as_of === 'string' && /Z$/.test(status.as_of) && Number.isFinite(Date.parse(status.as_of));
+}
 function createApp({catalog,env=process.env,clock=Date.now,es=null,statusProvider=null,observer=null,publicDir=path.join(__dirname,'../public')}={}) {
  if(!catalog||!Array.isArray(catalog.talks)||!catalog.talks.length)throw new Error('A nonempty verified catalog is required.');
  const talks=catalog.talks.map(t=>normalizeTalk({...t,fullness:undefined})); const byId=new Map(talks.map(t=>[t.id,t]));
@@ -55,8 +61,16 @@ function createApp({catalog,env=process.env,clock=Date.now,es=null,statusProvide
     return send(200,{items,mode,degraded,reason,source_talk:current.item});
    }
    if(req.method==='GET'&&pathname==='/api/config'){route=pathname;let live=false;try{live=Boolean(await engine?.available?.());}catch{}return send(200,{version,live_interactions:live,event:{name:'KubeCon + CloudNativeCon North America 2026',timezone:'America/Denver'},data_source:source});}
-   if(req.method==='GET'&&pathname==='/api/status'){route=pathname;let status=null;try{status=await statusProvider?.();}catch{}const valid=status?.status==='available'&&[status.p95_ms,status.error_ratio,status.degraded_share].every(Number.isFinite)&&typeof status.as_of==='string';return send(200,{status:valid?'available':'unavailable',p95_ms:valid?status.p95_ms:null,error_ratio:valid?status.error_ratio:null,degraded_share:valid?status.degraded_share:null,as_of:valid?status.as_of:null,version,search_mode:engine?.mode||'snapshot'});}
-   if(req.method==='GET'&&pathname==='/api/deps'){route=pathname;let connected=false;try{connected=Boolean(await engine?.available?.());}catch{}return send(200,{elasticsearch:{configured:Boolean(engine),connected},telemetry:{verified_status:Boolean(statusProvider)},version});}
+   if(req.method==='GET'&&pathname==='/api/status'){route=pathname;let status=null;try{status=await statusProvider?.();}catch{}const valid=verifiedStatus(status);return send(200,{status:valid?'available':'unavailable',p95_ms:valid?status.p95_ms:null,error_ratio:valid?status.error_ratio:null,degraded_share:valid?status.degraded_share:null,as_of:valid?status.as_of:null,version,search_mode:engine?.mode||'snapshot'});}
+   if(req.method==='GET'&&pathname==='/api/deps') {
+    route=pathname;
+    let connected=false, status=null;
+    await Promise.all([
+     (async()=>{try{connected=Boolean(await engine?.available?.());}catch{}})(),
+     (async()=>{try{status=await statusProvider?.();}catch{}})()
+    ]);
+    return send(200,{elasticsearch:{configured:Boolean(engine),connected},telemetry:{configured:Boolean(statusProvider),verified_status:verifiedStatus(status)},version});
+   }
    if(req.method==='POST'&&pathname==='/api/admin/mode'){route=pathname;const input=await body(req);if(!['bm25','hybrid','hybrid_rerank'].includes(input.mode))throw new HttpError(400,'Invalid search mode.');if(!engine?.setMode)throw new HttpError(503,'Elasticsearch is unavailable; mode cannot be changed.');await engine.setMode(input.mode);return send(200,{ok:true,mode:input.mode});}
    if(req.method==='POST'&&(pathname==='/api/interactions'||pathname==='/api/subscriptions')){
     route=pathname;const input=await body(req);const talkId=id(input.talk_id,'talk_id'), attendee=id(input.attendee_id,'attendee_id');if(!byId.has(talkId))throw new HttpError(404,'Talk not found.');

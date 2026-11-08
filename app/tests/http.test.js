@@ -48,3 +48,13 @@ test('successful internal auth can set runtime mode but malformed mode never wri
  assert.equal((await get('/api/admin/mode',{method:'POST',headers,body:'{"mode":"hybrid"}'})).status,200);assert.equal(mode,'hybrid');
  assert.equal((await get('/api/admin/mode',{method:'POST',headers,body:'{"mode":"invented"}'})).status,400);assert.equal(mode,'hybrid');
 });
+
+test('dependency status distinguishes configured provider from verified measurements',async t=>{
+ const get=await serve(t,{statusProvider:async()=>({status:'unavailable',p95_ms:null,error_ratio:null,degraded_share:null,as_of:null})});
+ const deps=await (await get('/api/deps',{headers:{authorization:'Bearer super-secret'}})).json();assert.equal(deps.telemetry.configured,true);assert.equal(deps.telemetry.verified_status,false);
+});
+
+test('only valid actual measurements verify dependency status',async t=>{
+ const get=await serve(t,{statusProvider:async()=>({status:'available',p95_ms:120,error_ratio:0.02,degraded_share:0.5,as_of:'2026-11-08T00:00:00Z'})});
+ const deps=await (await get('/api/deps',{headers:{authorization:'Bearer super-secret'}})).json();assert.equal(deps.telemetry.verified_status,true);
+});

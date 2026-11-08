@@ -15,6 +15,33 @@ function filtersFor(filters,fullIds=[]){
  const must=filters.q?[{multi_match:{query:filters.q,fields:['title^3','abstract','speakers^2','tags^2','track'],type:'best_fields',operator:'and'}}]:[{match_all:{}}];
  return {bool:{must,filter,...(filters.available&&fullIds.length?{must_not:[{terms:{id:fullIds}}]}:{})}};
 }
+// Crowd absence can mean zero only after the entire aggregation is verified complete.
+function validatedCrowdBuckets(data, talks) {
+ const shards = data?._shards;
+ const aggregation = data?.aggregations?.talks;
+ if (data?.timed_out !== false || !shards ||
+     !Number.isSafeInteger(shards.total) || shards.total < 1 ||
+     shards.successful !== shards.total || shards.failed !== 0 ||
+     !aggregation || aggregation.sum_other_doc_count !== 0 ||
+     aggregation.doc_count_error_upper_bound !== 0 || !Array.isArray(aggregation.buckets)) {
+  throw new DependencyError(502);
+ }
+ const requestedIds = new Set(talks.map(talk => talk.id));
+ const buckets = new Map();
+ const isCount = value => Number.isSafeInteger(value) && value >= 0;
+ for (const bucket of aggregation.buckets) {
+  const bookmarks = bucket?.bookmarks?.doc_count;
+  const reports = bucket?.reports?.doc_count;
+  if (!requestedIds.has(bucket?.key) || buckets.has(bucket.key) ||
+      !isCount(bucket.doc_count) || !isCount(bookmarks) || !isCount(reports) ||
+      bookmarks + reports > bucket.doc_count ||
+      (bucket.doc_count_error_upper_bound !== undefined && bucket.doc_count_error_upper_bound !== 0)) {
+   throw new DependencyError(502);
+  }
+  buckets.set(bucket.key, bucket);
+ }
+ return buckets;
+}
 class Elasticsearch {
  constructor({env=process.env,fetchImpl=fetch,clock=Date.now,withStage=(_name,fn)=>fn()}={}){
   this.env=env;this.fetch=fetchImpl;this.clock=clock;this.withStage=withStage;
@@ -59,9 +86,9 @@ class Elasticsearch {
    }}}
   };
   const data=await this.request(`/${this.indexes.interactions}/_search`,{timeout,body:requestBody});
-  if(!Array.isArray(data.aggregations?.talks?.buckets))throw new DependencyError(502);
-  const buckets=new Map(data.aggregations.talks.buckets.map(b=>[b.key,b]));return new Map(talks.map(t=>{
-   const bucket=buckets.get(t.id),bookmarks=bucket?.bookmarks?.doc_count||0,reports=bucket?.reports?.doc_count||0,capacity=Number.isFinite(t.capacity)?t.capacity:null,pressure=capacity>0?bookmarks/capacity:null;
+  const buckets = validatedCrowdBuckets(data, talks);
+  return new Map(talks.map(t=>{
+   const bucket=buckets.get(t.id),bookmarks=bucket?bucket.bookmarks.doc_count:0,reports=bucket?bucket.reports.doc_count:0,capacity=Number.isFinite(t.capacity)?t.capacity:null,pressure=capacity>0?bookmarks/capacity:null;
    return [t.id,{bookmarks,reports,capacity,capacity_source:'estimate',pressure,likely_full:reports>=2||(pressure!==null&&pressure>=1),signal:'live'}];
   }));
  }
