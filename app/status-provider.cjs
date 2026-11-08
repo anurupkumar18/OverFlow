@@ -5,7 +5,7 @@ const selector = 'service_name="overflow"';
 const total = `sum(rate(overflow_search_requests_total{${selector}}[5m]))`;
 const queries = {
   p95_ms: `histogram_quantile(0.95, sum by (le) (rate(overflow_search_duration_milliseconds_bucket{${selector}}[5m])))`,
-  error_ratio: `sum(rate(overflow_search_requests_total{${selector},http_response_status_code=~"5.."}[5m])) / ${total}`,
+  error_ratio: `(sum(rate(overflow_search_requests_total{${selector},http_response_status_code=~"5.."}[5m])) or on() vector(0)) / (${total} > 0)`,
   degraded_share: `sum(rate(overflow_search_degraded_total{${selector}}[5m])) / ${total}`,
 };
 

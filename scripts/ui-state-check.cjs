@@ -25,10 +25,26 @@ function harness() {
   };
   const context = vm.createContext({ document: doc, window: { addEventListener: (name, fn) => windowEvents.set(name, fn) }, localStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) }, api, icon: () => '', location: { hash: '' }, history: { replaceState() {} }, Intl, Date, Map, Set, URL, URLSearchParams, AbortController, TextEncoder, Blob, crypto: { randomUUID: () => '12345678-test' }, setTimeout: () => 1, clearTimeout() {}, console });
   vm.runInContext(source, context);
-  return { run: (script) => vm.runInContext(script, context), elements, element, storage, windowEvents, requests, doc };
+  return { run: (script) => vm.runInContext(script, context), elements, element, storage, windowEvents, requests, doc, api };
 }
 const talk = { id: 'one', title: 'A real session', speakers: ['Speaker'], start: '2026-11-10T17:00:00Z', end: '2026-11-10T17:35:00Z', capacity: 200, capacity_source: 'estimate', fullness: { signal: 'live', bookmarks: 199, reports: 4, pressure: 0.995, capacity: 200, capacity_source: 'estimate', likely_full: true } };
 const tests = [
+  ...[['hybrid','snapshot'],['snapshot','hybrid'],['hybrid','bm25'],['hybrid_rerank','hybrid']].map(([previousMode,nextMode]) => [
+    `pagination restarts once and pins ${previousMode} to ${nextMode} ordering`, async () => {
+      const h = harness(); let calls = 0;
+      h.api.search = async filters => {
+        h.requests.push(filters); calls++;
+        return {items:[{...talk,id:calls < 3 ? 'refreshed-first' : 'refreshed-next'}],total:200,next_offset:calls < 3 ? 100 : null,mode:nextMode,degraded:nextMode==='snapshot'};
+      };
+      h.run(`state.filters.q='cloud'; state.completedFilters=filtersKey(); state.loaded=[{id:'old-order'}]; state.nextOffset=20; state.mode=${JSON.stringify(previousMode)};`);
+      await h.run('search({append:true})');
+      assert.equal(h.requests.length,2);assert.equal(h.requests[0].offset,20);assert.equal(h.requests[1].offset,0);assert.equal(h.requests[1].mode,nextMode);
+      assert.equal(h.run('state.loaded.some(t=>t.id==="old-order")'),false);assert.equal(h.run('state.loaded[0].id'),'refreshed-first');assert.match(h.element('#toast').textContent,/refresh|first/i);
+      await h.run('search({append:true})');
+      assert.equal(h.requests.length,3);assert.equal(h.requests[2].offset,100);assert.equal(h.requests[2].mode,nextMode);assert.equal(h.run('state.loaded.length'),2);
+      await h.run('search()');assert.equal(h.requests[3].mode,undefined);assert.equal(h.requests[3].offset,0);
+    }
+  ]),
   ['service health exposes only actual metrics or unavailable', async () => {
     const h = harness(); h.run('renderServiceHealth({status:"unavailable",p95_ms:null,error_ratio:null,degraded_share:null})');
     assert.match(h.element('#service-health').textContent, /unavailable/i); assert.doesNotMatch(h.element('#service-health').textContent, /0 ms/);

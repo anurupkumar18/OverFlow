@@ -32,3 +32,8 @@ Every search and Plan B response contains mode and degraded. Mode ladder hybrid_
 
 ## Success and QA
 Node tests cover schedule, Plan B, fallback, input validation, auth and secret boundaries. Run timezone matrix UTC/Denver/Tokyo. Playwright exercises desktop and mobile, keyboard, search/filter, empty state, saved persistence, detail and Plan B. Manually inspect screenshots and UI flows; report as agent-operated manual QA, not human acceptance. Independent review verifies implementation and claims. Live integrations must be separately verified before called complete.
+
+## Final review transition guarantees
+Search accepts an optional per-result-set `mode` ceiling (`hybrid_rerank`, `hybrid`, `bm25`, `snapshot`). It can select a lower mode than the runtime setting and never raises or changes that setting. The browser discards an offset page whose mode/order differs, announces a refresh, fetches offset zero once with that new ceiling, and pins it for later pages. A new search clears the pin. This also makes the top20 rerank-to-hybrid transition settle on an accessible hybrid result set instead of repeatedly restarting. Snapshot pins remain local during provider recovery.
+
+Alerts require a complete subscription search: explicit no timeout, all successful shards, exact total and every matching hit within the bounded1000 result limit. Partial, truncated or malformed results are unavailable (503), never an all-clear. The default status error query supplies zero only for the missing5xx numerator; the total request denominator must be present and positive. Missing or zero traffic remains unavailable.

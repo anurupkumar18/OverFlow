@@ -15,7 +15,7 @@ const state = {
   items: new Map(), saved: new Map(), sharedInterest: new Set(), config: null, mode: null, view: 'discover',
   searchSequence: 0, dialogSequence: 0, searchController: null, dialogController: null,
   debounce: null, toastTimer: null, dialogSource: null, lastFocus: null, storageAvailable: true,
-  loaded: [], nextOffset: null, total: 0, facetDays: '', completedFilters: null,
+  loaded: [], nextOffset: null, paginationMode: null, total: 0, facetDays: '', completedFilters: null,
 };
 
 function time(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Time unavailable' : timeFormat.format(date); }
@@ -232,12 +232,13 @@ function updateFilterUi() {
   $('#clear-filters').hidden = !state.filters.q && !state.filters.day && !state.filters.track && !state.filters.available;
   $('#day-tabs').querySelectorAll('[data-day]').forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.day === state.filters.day)));
 }
-async function search({ append = false } = {}) {
+async function search({ append = false, restartMode = null } = {}) {
   const requestedFilters = { ...state.filters };
   const requestedKey = filtersKey(requestedFilters);
   // A delayed/programmatic append is never allowed to reuse another query's cursor.
   if (append && (state.completedFilters !== requestedKey || state.nextOffset === null)) append = false;
   const offset = append ? state.nextOffset : 0;
+  const modeCeiling = append ? state.paginationMode : restartMode;
   clearTimeout(state.debounce);
   const sequence = ++state.searchSequence;
   state.searchController?.abort();
@@ -248,8 +249,15 @@ async function search({ append = false } = {}) {
   else { $('#load-more').disabled = true; $('#load-more').textContent = 'Loading more…'; }
   updateFilterUi();
   try {
-    const data = await api.search({ ...requestedFilters, offset }, controller.signal);
+    const data = await api.search({ ...requestedFilters, offset, ...(modeCeiling ? { mode: modeCeiling } : {}) }, controller.signal);
     if (sequence !== state.searchSequence) return;
+    if (append && data.mode !== state.mode) {
+      // Never combine a prior ranking's prefix with a new ranking's offset.
+      // The fresh request cannot recurse: it replaces results at offset zero.
+      announce('Search mode changed. Refreshing sessions from the first result.');
+      return search({ restartMode: data.mode });
+    }
+    state.paginationMode = modeCeiling;
     const items = Array.isArray(data.items) ? data.items.slice(0, 100) : [];
     items.forEach(cacheTalk);
     if (items.some((talk) => state.saved.has(String(talk.id)))) renderPersonalPlan();
@@ -266,6 +274,7 @@ async function search({ append = false } = {}) {
     $('#load-more').hidden = state.nextOffset === null;
     $('#load-more').disabled = false;
     $('#load-more').textContent = 'Load more sessions';
+    $('#result-limit').hidden = Number(data.total) <= state.loaded.length;
     if (Number(data.total) > state.loaded.length) {
       $('#result-limit').hidden = false;
       $('#result-limit').textContent = `Showing ${state.loaded.length} of ${data.total} sessions. Load more, or choose a day, track, or topic.`;

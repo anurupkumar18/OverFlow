@@ -15,6 +15,7 @@ async function request(path, options = {}) {
 export const api = {
   search(filters, signal) {
     const query = new URLSearchParams({ q: filters.q || '', day: filters.day || '', track: filters.track || '', available: String(Boolean(filters.available)), offset: String(filters.offset || 0) });
+    if (filters.mode) query.set('mode', filters.mode);
     return request(`/api/search?${query}`, { signal });
   },
   talk(id, signal) { return request(`/api/talks/${encodeURIComponent(id)}`, { signal }); },

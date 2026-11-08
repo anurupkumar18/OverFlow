@@ -87,3 +87,35 @@ for (const [name,crowd] of badCrowdResponses) {
   const candidates=await es.planBCandidates(talk);assert.equal(candidates.items[0].fullness.signal,'unavailable');assert.equal(candidates.items[0].fullness.likely_full,null);assert.equal(candidates.degraded,true);assert.match(candidates.reason,/unavailable/i);
  });
 }
+
+for (const [name,response] of [
+ ['timed out empty',{timed_out:true,_shards:{total:1,successful:1,failed:0},hits:{total:{value:0,relation:'eq'},hits:[]}}],
+ ['failed shards with surviving hit',{timed_out:false,_shards:{total:2,successful:1,failed:1},hits:{total:{value:1,relation:'eq'},hits:[{_source:{talk_id:'a'}}]}}],
+ ['truncated hits',{timed_out:false,_shards:{total:1,successful:1,failed:0},hits:{total:{value:2,relation:'eq'},hits:[{_source:{talk_id:'a'}}]}}],
+ ['inexact total',{timed_out:false,_shards:{total:1,successful:1,failed:0},hits:{total:{value:1,relation:'gte'},hits:[{_source:{talk_id:'a'}}]}}],
+]) {
+ test('alerts rejects '+name+' rather than claiming no full-room alerts',async()=>{
+  const es=new Elasticsearch({env:{ES_URL:'https://elastic.test'},fetchImpl:async(url)=>Response.json(new URL(url).pathname==='/talk_alerts/_search'?response:completeCrowd([{key:'a',doc_count:2,bookmarks:{doc_count:0},reports:{doc_count:2}}])),clock:()=>Date.parse('2026-11-08T00:00:00Z')});
+  await assert.rejects(es.alerts('person',new Map([['a',talk]])),/unavailable/);
+ });
+}
+test('complete subscription search permits verified empty alerts and actual full-room alerts',async()=>{
+ let subscriptions=[];const es=new Elasticsearch({env:{ES_URL:'https://elastic.test'},clock:()=>Date.parse('2026-11-08T00:00:00Z'),fetchImpl:async(url,options)=>{
+  if(new URL(url).pathname==='/talk_alerts/_search'){
+   const body=JSON.parse(options.body);assert.equal(body.track_total_hits,true);
+   return Response.json({timed_out:false,_shards:{total:1,successful:1,failed:0},hits:{total:{value:subscriptions.length,relation:'eq'},hits:subscriptions}});
+  }
+  return Response.json(completeCrowd([{key:'a',doc_count:2,bookmarks:{doc_count:0},reports:{doc_count:2}}]));
+ }});
+ assert.deepEqual(await es.alerts('person',new Map([['a',talk]])),[]);
+ subscriptions=[{_source:{talk_id:'a',attendee_id:'person'}}];const alerts=await es.alerts('person',new Map([['a',talk]]));assert.equal(alerts[0].talk_id,'a');assert.equal(alerts[0].item.fullness.likely_full,true);
+});
+
+test('per-query lower mode ceiling pins ordering and cannot override runtime rollback',async()=>{
+ const f=fixture({mode:'hybrid_rerank'});
+ assert.equal((await f.es.searchTalks({q:'cloud',mode:'hybrid'},[talk])).mode,'hybrid');
+ assert.equal((await f.es.searchTalks({q:'cloud',mode:'bm25'},[talk])).mode,'bm25');
+ f.setMode('bm25');f.es.settingsAt=-Infinity;
+ assert.equal((await f.es.searchTalks({q:'cloud',mode:'hybrid_rerank'},[talk])).mode,'bm25');
+ assert.equal(f.es.requestedMode,'bm25');
+});

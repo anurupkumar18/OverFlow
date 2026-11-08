@@ -52,6 +52,20 @@
               "maximum": 1000,
               "default": 0
             }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hybrid_rerank",
+                "hybrid",
+                "bm25",
+                "snapshot"
+              ]
+            },
+            "description": "Optional per-result-set search mode ceiling for stable pagination. May select a lower mode than runtime settings; cannot raise or mutate runtime mode. snapshot stays local even during provider recovery. Reset on new search."
           }
         ],
         "responses": {
@@ -95,7 +109,8 @@
               }
             }
           }
-        }
+        },
+        "description": "When a subsequent page changes mode/order, discard that offset page and refresh offset zero with the new mode ceiling. Pin that ceiling until a new search; do not append incompatible rankings. Each refresh starts once without recursive page retries."
       }
     },
     "/api/talks/{id}": {
@@ -357,7 +372,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Requires complete subscription search and crowd aggregations. Timed-out, failed-shard, truncated/inexact or malformed subscription hits yield 503 unavailable, never a verified empty alert list. Requests beyond the bounded 1000-subscription result limit remain unavailable."
       }
     },
     "/api/interactions": {

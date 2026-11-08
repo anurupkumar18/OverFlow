@@ -18,9 +18,11 @@ function searchFilters(url) {
  const q=url.searchParams.get('q')||'', day=url.searchParams.get('day')||'',track=url.searchParams.get('track')||'',available=url.searchParams.get('available')||'false';
  if(q.length>500||track.length>160||!['true','false'].includes(available))throw new HttpError(400,'Invalid search filters.');
  if(day&&(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day))||new Date(day).toISOString().slice(0,10)!==day))throw new HttpError(400,'Invalid day; use YYYY-MM-DD.');
+ const mode=url.searchParams.get('mode')||'';
+ if(mode&&!['hybrid_rerank','hybrid','bm25','snapshot'].includes(mode))throw new HttpError(400,'Invalid search mode ceiling.');
  const offsetValue=url.searchParams.get('offset')||'0';
  if(!/^\d{1,4}$/.test(offsetValue)||Number(offsetValue)>1000)throw new HttpError(400,'Invalid offset; use an integer from 0 to 1000.');
- return {q:q.trim(),day,track,available:available==='true',offset:Number(offsetValue)};
+ return {q:q.trim(),day,track,available:available==='true',offset:Number(offsetValue),...(mode?{mode}:{})};
 }
 function verifiedStatus(status) {
  return status?.status === 'available' &&
@@ -34,7 +36,7 @@ function createApp({catalog,env=process.env,clock=Date.now,es=null,statusProvide
  const version=env.APP_VERSION||'dev';const source=catalog.source;
  const engine=es; const fallbackReason='Live search is unavailable; browsing the verified schedule snapshot.';
  async function query(filters) {
-   if(engine?.searchTalks){try{return {...await engine.searchTalks(filters,talks),source,version,facets:facets(talks)};}catch{/* Snapshot fallback never exposes provider errors. */}}
+   if(filters.mode!=='snapshot'&&engine?.searchTalks){try{return {...await engine.searchTalks(filters,talks),source,version,facets:facets(talks)};}catch{/* Snapshot fallback never exposes provider errors. */}}
    return {...snapshotSearch(talks,filters),mode:'snapshot',degraded:true,source,version};
  }
  async function one(talkId) {

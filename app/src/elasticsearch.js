@@ -104,7 +104,10 @@ class Elasticsearch {
   return {...base,size:20,retriever:{text_similarity_reranker:{retriever:rrf,field:'abstract',inference_id:this.env.ES_RERANK_INFERENCE_ID,inference_text:filters.q,rank_window_size:20}}};
  }
  async searchTalks(filters,talks){
-  const wanted=await this.settings();const key=JSON.stringify([wanted,filters]);const cached=this.cache.get(key);
+  const runtimeMode=await this.settings();
+  // A request may choose a lower ceiling for stable pagination, never raise the runtime mode.
+  const wanted=MODES[Math.max(MODES.indexOf(runtimeMode),MODES.indexOf(filters.mode))];
+  const key=JSON.stringify([wanted,filters]);const cached=this.cache.get(key);
   if(cached&&this.clock()-cached.at<60000){this.mode=cached.result.mode;return structuredClone(cached.result);}
   const began=performance.now();let crowd=null;try{crowd=await this.withStage('crowd',()=>this.fullness(talks));}catch{}
   const fullIds=crowd?[...crowd].filter(([,f])=>f.likely_full).map(([id])=>id):[];
@@ -147,10 +150,29 @@ class Elasticsearch {
   const doc=crypto.createHash('sha256').update(JSON.stringify([talk_id,attendee_id])).digest('hex');await this.request(`/${this.indexes.alerts}/_doc/${doc}?refresh=wait_for`,{method:'PUT',body:{talk_id,attendee_id,created_at:new Date(this.clock()).toISOString()}});
  }
  async alerts(attendee_id,byId){
-  const subscriptions=await this.request(`/${this.indexes.alerts}/_search`,{body:{size:1000,query:{term:{attendee_id}}}});
-  if(!Array.isArray(subscriptions.hits?.hits))throw new DependencyError(502);
-  const talks=subscriptions.hits.hits.map(h=>byId.get(h._source.talk_id)).filter(t=>t&&Date.parse(t.end)>this.clock());if(!talks.length)return [];
-  const crowd=await this.fullness(talks);return talks.filter(t=>crowd.get(t.id).likely_full).map(t=>({talk_id:t.id,type:'likely_full',message:'This talk has a crowd signal indicating it may be full.',item:normalizeTalk(t,crowd.get(t.id))}));
+  const subscriptions = await this.request(`/${this.indexes.alerts}/_search`, {
+   body:{size:1000,track_total_hits:true,query:{term:{attendee_id}}}
+  });
+  const shards = subscriptions?._shards;
+  const hits = subscriptions?.hits?.hits;
+  const total = subscriptions?.hits?.total;
+  if (subscriptions?.timed_out !== false || !shards ||
+      !Number.isSafeInteger(shards.total) || shards.total < 1 ||
+      shards.successful !== shards.total || shards.failed !== 0 ||
+      !Array.isArray(hits) || total?.relation !== 'eq' ||
+      !Number.isSafeInteger(total.value) || total.value < 0 || total.value !== hits.length ||
+      hits.some(hit => typeof hit?._source?.talk_id !== 'string')) {
+   throw new DependencyError(502);
+  }
+  const talks = hits.map(hit => byId.get(hit._source.talk_id))
+   .filter(talk => talk && Date.parse(talk.end) > this.clock());
+  if (!talks.length) return [];
+  const crowd = await this.fullness(talks);
+  return talks.filter(talk => crowd.get(talk.id).likely_full).map(talk => ({
+   talk_id:talk.id,type:'likely_full',
+   message:'This talk has a crowd signal indicating it may be full.',
+   item:normalizeTalk(talk,crowd.get(talk.id))
+  }));
  }
 }
 module.exports={Elasticsearch,DependencyError,midnight};

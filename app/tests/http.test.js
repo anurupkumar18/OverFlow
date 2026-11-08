@@ -58,3 +58,14 @@ test('only valid actual measurements verify dependency status',async t=>{
  const get=await serve(t,{statusProvider:async()=>({status:'available',p95_ms:120,error_ratio:0.02,degraded_share:0.5,as_of:'2026-11-08T00:00:00Z'})});
  const deps=await (await get('/api/deps',{headers:{authorization:'Bearer super-secret'}})).json();assert.equal(deps.telemetry.verified_status,true);
 });
+
+test('snapshot mode ceiling stays local during provider recovery and invalid ceilings are rejected',async t=>{
+ let calls=0;const get=await serve(t,{es:{searchTalks:async()=>{calls++;return {items:[],total:0,mode:'hybrid',degraded:false};}}});
+ const result=await (await get('/api/search?mode=snapshot')).json();assert.equal(result.mode,'snapshot');assert.equal(result.total,2);assert.equal(calls,0);
+ assert.equal((await get('/api/search?mode=pretend')).status,400);
+});
+
+test('incomplete live alerts are unavailable at HTTP boundary rather than a verified empty list',async t=>{
+ const get=await serve(t,{es:{available:async()=>true,alerts:async()=>{throw new Error('Incomplete subscription search');}}});
+ const response=await get('/api/alerts?attendee_id=person');assert.equal(response.status,503);assert.equal((await response.json()).items,undefined);
+});

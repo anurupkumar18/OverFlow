@@ -1,5 +1,19 @@
 # Notes for your coding agent
 
+## Project: Overflow
+
+This checkout is a local Overflow build begun November 8, 2026, by the user's explicit start-now instruction. It is isolated on `codex/overflow-build`. `upstream` is the public starter, not an owned deployment destination; never push there. No `origin` or cloud deployment is verified. The starter's cluster setup instructions below apply when deploying, and must not block independent local development.
+
+Read `AGENTS.local.md`, `docs/superpowers/specs/2026-11-08-overflow-design.md`, `docs/qa.md`, and `.agent/STATE.md` (if present) before resuming. Verify git status and current branch first; preserve unrelated work. Use `npm ci --prefix app`, `npm --prefix app start`; local preview is port 8080.
+
+Product invariants: UTC Z timestamps; reject same-room overlaps; honest mode/degraded on search and Plan B; at most three alternatives within ±10 minutes, different room, not ended/known full; crowd denominator and estimate source always present; probes never call out; no server secrets in browser/logs; declared API contract and bounded requests. Unknown crowd observations are null, never assumed zero. Same floor requires same building. Partial provider responses are unavailable, never an all-clear. Changing ranking mode must restart pagination.
+
+Personal saves remain device-only. Explicit live interest is a separate acknowledged server action. Never restore persisted crowd values as current. The palette is user-selected earth tones/neutrals with one standout accent, implemented with cobalt actions. Keep visible focus, 44px controls, no horizontal overflow, and reduced-motion support.
+
+No fabricated labels, numbers, PR reviews, investigations, remote telemetry or deployment claims. See `docs/evidence-status.md`. Do not enter/read credentials or alter other teams' resources. Human contributions come only from `docs/human-log.md`. The assistant author is Codex, not Claude.
+
+## Starter deployment procedures
+
 This repo deploys to this team's own Kubernetes cluster at the Cloud Native Hackathon: a virtual cluster (vcluster) that Radar Cloud lists as **`__TEAM__`**, where the team is cluster-admin. The app runs in namespace `team-__TEAM__`. Use Radar Cloud's MCP server (`radar-cloud`) for everything you observe or change on the cluster. Read each tool's schema; don't invent parameters.
 
 **Pass `cluster` on every Radar call.** The organization has about 40 team clusters plus `cnh`, the platform's cluster, where teams have no access. Call `list_clusters` once per session, take the `id` of the entry whose `name` is exactly `__TEAM__`, and pass that id as `cluster` on every other Radar tool call. With this many clusters the tools can't pick a default. The person only has access to this team's cluster; never call a tool against `cnh` or another team's cluster. Pass `namespace: team-__TEAM__` wherever a tool takes it, unless you mean another namespace in this cluster.
