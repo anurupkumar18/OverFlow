@@ -38,9 +38,9 @@ For the host-timezone checks, run the Node suite with `TZ=UTC`, `TZ=America/Denv
 - When live services are connected, Share interest and Withdraw interest explicitly contribute to crowd counts; these actions are separate from private saved talks. Counts update only from the server response.
 - With verified Elasticsearch interaction data, the heuristic marks likely full at bookmarks/capacity ≥1, or two distinct recent full reports within 10 minutes. Smoke identities are excluded.
 - Room pressure uses exact ES|QL counts with a complete aggregation fallback for compatible providers. Invalid or incomplete results remain unknown.
-- Watch a room after the subscription is acknowledged. While the page is visible, checks run every15 seconds with bounded backoff; Pause/Resume controls stay available. Named warnings retain Details and Plan B actions inside dialogs, and old room observations become unknown when checks stop or fail.
+- Watch a room after the subscription is acknowledged. While the page is visible, checks run every 15 seconds with bounded backoff; Pause/Resume controls stay available. Named warnings retain Details and Plan B actions inside dialogs, and old room observations become unknown when checks stop or fail.
 
-The [official schedule](https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/program/schedule/) links a public Sessionize API. The source contained 600 entries; 480 had speakers, abstract, room and times; excluding 10 simultaneous poster entries left 470. Conservative exact-name mentions from the official CNCF landscape add456 project tags across363 sessions; original tags and base schedule records are preserved. These are textual mentions, not relevance labels or affiliations. See [data provenance](app/data/SOURCE.md) for scope, source hashes, matching limits and timestamp conversion.
+The [official schedule](https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/program/schedule/) links a public Sessionize API. The source contained 600 entries; 480 had speakers, abstract, room and times; excluding 10 simultaneous poster entries left 470. Conservative exact-name mentions from the official CNCF landscape add 456 project tags across 363 sessions; original tags and base schedule records are preserved. These are textual mentions, not relevance labels or affiliations. See [data provenance](app/data/SOURCE.md) for scope, source hashes, matching limits and timestamp conversion.
 
 ## Architecture
 
@@ -76,7 +76,7 @@ npm run build:browser --prefix app
 node --env-file=/absolute/path/to/private.env --require ./app/telemetry.cjs app/server.js
 ```
 
-Elasticsearch requires an actual endpoint, scoped API key and populated indices. Ingestion must pin an inference endpoint that exists in the target account; no endpoint is assumed from a tutorial. The evaluation tooling starts with no approved queries and no human labels; no ranking results are fabricated. See [evaluation](eval/README.md). An isolated Elasticsearch9.5.6 run indexed all470 talks and passed12 API scenarios; [the report](docs/local-elasticsearch-qa.md) distinguishes lexical/ES|QL evidence from unverified inference and remote deployment.
+Elasticsearch requires an actual endpoint, scoped API key and populated indices. Ingestion must pin an inference endpoint that exists in the target account; no endpoint is assumed from a tutorial. The evaluation tooling starts with no approved queries and no human labels; no ranking results are fabricated. See [evaluation](eval/README.md). An isolated Elasticsearch 9.5.6 run indexed all 470 talks and passed 12 API scenarios; [the report](docs/local-elasticsearch-qa.md) distinguishes lexical/ES|QL evidence from unverified inference and remote deployment.
 
 See [observability](observability/README.md) for OTel and Dash0 setup. A real local collector received server traces/logs/metrics and browser Web Vitals, sanitized errors and events, with linked browser/backend spans. This proves local exports, not Dash0 account ingestion. Browser telemetry stays disabled unless dedicated browser ingest configuration is explicitly enabled. Queries, attendee IDs and raw error messages are excluded from its payloads.
 
@@ -109,7 +109,7 @@ No Gitar-reviewed PR, Agent0 finding, Radar investigation, remote deployment, or
 
 ## AI and human contributions
 
-Codex and specialized coding/research agents authored the implementation and performed automated and agent-operated manual QA. The public [Radar starter](https://github.com/skyhook-io/cnh-starter) is prior third-party work. Gitar, Agent0 and Radar did not perform work in this session. Git history records commits; no author counts are invented.
+Codex and specialized coding/research agents authored the implementation and performed automated and agent-operated manual QA. The public [Radar starter](https://github.com/skyhook-io/cnh-starter) is prior third-party work. Gitar, Agent0 and Radar did not perform work in this session. As of commit `1816851`, this branch contains 13 commits after the public starter, created by Codex during this session. This counts Git commits, not human/AI effort or lines of code; the user contributions below are recorded separately.
 
 The user's observed contributions are the supplied reference briefs, the start-now/QA/design direction, and the palette choice. See [human log](docs/human-log.md), [decisions](docs/decisions.md), and [lessons](docs/lessons.md). Future relevance labels, cloud setup, video recording, and submission must be recorded only when actually performed.
 

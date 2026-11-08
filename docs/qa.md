@@ -19,7 +19,7 @@ Playwright Chromium, desktop 1440×1000, mobile 390×844, narrow 320×780:
 - Search and empty-result recovery; day and track filters; final real-service pagination reached all 470 unique sessions, with no browser page errors.
 - Session detail and Plan B; three real alternatives for an observed test session.
 - Native dialog Escape and focus restoration; `/` focuses search outside text inputs.
-- Device-only saved plan survives reload; calendar download contains two selected QA events, CRLF lines and UTF-8 lines no longer than 75 octets.
+- Device-only saved plan survives reload; calendar download contains selected QA events, CRLF lines and UTF-8 lines no longer than 75 octets.
 - No horizontal overflow at 390px and 320px; reduced-motion preference recognized.
 - Axe 4.14 scans of desktop discovery, Plan B, and phone discovery found zero WCAG 2 A/AA and 2.1 AA violations after contrast fixes. Automated scans are not a complete accessibility audit.
 - Screenshots were visually inspected. Secondary-text contrast was corrected; the hero was shortened to expose sessions sooner; phone layout and dialog hierarchy were inspected.
@@ -32,17 +32,17 @@ Six additional browser assertions verified hybrid-to-snapshot and rerank-to-hybr
 
 ## Delivery completion checks
 
-The actual Dash0 browser SDK was exercised in Chromium against a localhost collector on Node22. The collector received Web Vitals, generic errors, safe events and an independent anonymous identity; the browser fetch span matched its backend trace and parent ID. A combined-payload check verified synthetic page/search/error/read-token markers were absent from browser, server and outbound spans. This test caught and fixed a stable OTel URL-query leak. No remote Dash0 ingestion is inferred.
+The actual Dash0 browser SDK was exercised in Chromium against a localhost collector on Node 22. The collector received Web Vitals, generic errors, safe events and an independent anonymous identity; the browser fetch span matched its backend trace and parent ID. A combined-payload check verified synthetic page/search/error/read-token markers were absent from browser, server and outbound spans. This test caught and fixed a stable OTel URL-query leak. No remote Dash0 ingestion is inferred.
 
-The main15 Playwright flows were rerun after the hybrid Plan B/RUM/contract integration, with three actual snapshot alternatives, zero checked axe violations and no narrow-screen overflow. Contract tests exercise all browser wrappers against the real local HTTP app and compare them with the runtime route inventory and declared caller roles. They are route coverage, not a complete formal validation of every response schema.
+The main 15 Playwright flows were rerun after the hybrid Plan B/RUM/contract integration, with three actual snapshot alternatives, zero checked axe violations and no narrow-screen overflow. Contract tests exercise all browser wrappers against the real local HTTP app and compare them with the runtime route inventory and declared caller roles. They are route coverage, not a complete formal validation of every response schema.
 
-The final room-watch/Plan B browser fixture passed17 scenarios. It exercises acknowledged registration,15-second visible-page checks, bounded failure backoff, pause/resume, pending-write races, persistent named actions inside/outside native dialogs, current fullness propagation and stale/cleared observations becoming unknown. Fixture screenshots deliberately simulate crowd API responses; they are not evidence of physical occupancy or deployed provider traffic.
+The final room-watch/Plan B browser fixture passed 17 scenarios. It exercises acknowledged registration, 15-second visible-page checks, bounded failure backoff, pause/resume, pending-write races, persistent named actions inside/outside native dialogs, current fullness propagation and stale/cleared observations becoming unknown. Fixture screenshots deliberately simulate crowd API responses; they are not evidence of physical occupancy or deployed provider traffic.
 
 Fresh evaluation intentionally exits not_evaluated (n=0) without approved human evidence. Regression tests prove fresh provider failures can reject an old baseline, source/index mismatch cannot pass, and observed provider drift remains unavailable. Provider fixtures in these tests are not measured ranking results.
 
 ## Real local Elasticsearch
 
-An isolated Elasticsearch9.5.6 basic-license runtime indexed the same470-record catalog. All12 final API scenarios passed, plus capacity-boundary and nonvacuous full-room-exclusion checks. Actual ES|QL, strict aggregation parity, BM25, MLT Plan B, writes/alerts, mode persistence and fallback were exercised. Semantic mapping/inference was disabled. See [the bounded report](local-elasticsearch-qa.md). A critical host memory-pressure guard ended the run before browser-on-real-Elasticsearch verification; owned services stopped and ports were checked clear.
+An isolated Elasticsearch 9.5.6 basic-license runtime indexed the same 470-record catalog. All 12 final API scenarios passed, plus capacity-boundary and nonvacuous full-room-exclusion checks. Actual ES|QL, strict aggregation parity, BM25, MLT Plan B, writes/alerts, mode persistence and fallback were exercised. Semantic mapping/inference was disabled. See [the bounded report](local-elasticsearch-qa.md). An initial critical memory-pressure guard ended the API run. A later strictly sequenced, supervised attempt completed only initial real browser browsing before renewed pressure stopped the temporary services. The full real-database browser workflow remains unverified; owned processes closed and test ports were checked clear.
 
 ## Independent review
 
@@ -55,4 +55,4 @@ A fresh whole-branch review then found incomplete alert searches, fallback pagin
 - No verified remote Elasticsearch, inference endpoint, Dash0 account ingestion, Radar cluster, Gitar PR review or public deployment.
 - Remote browser RUM, percolator alerts, hosted investigations, applied dashboards and SLOs are not claimed. Alerts use acknowledged subscriptions and visible-page polling. ES|QL counts have a strictly checked aggregation compatibility fallback; production crowd data is unverified.
 - Docker CLI is absent on this machine, so local container build was not run. A container build job is included in CI but has not run remotely.
-- No browser run against real Elasticsearch, human relevance labels, production latency benchmark, phone hardware test, screen-reader user study, recorded video, or submission exists from this session.
+- No completed live browser workflow against real Elasticsearch, human relevance labels, production latency benchmark, phone hardware test, screen-reader user study, recorded video, or submission exists from this session.

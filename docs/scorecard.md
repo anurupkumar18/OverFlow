@@ -4,7 +4,7 @@ No numeric judging points are estimated, and no judge endorsement is implied. Th
 
 | Area | Evidence strength | Main gap |
 |---|---|---|
-| Elasticsearch | Strong local implementation and actual470-record ES runtime/API checks; hybrid adapters, bounded fallback and eval tools | Real inference, cloud integration, browser-on-real-ES and human relevance measurements |
+| Elasticsearch | Strong local implementation and actual 470-record ES runtime/API checks; hybrid adapters, bounded fallback and eval tools | Real inference, cloud integration, browser-on-real-ES and human relevance measurements |
 | Dash0 | Strong local export/correlation/privacy evidence; browser SDK and prepared dashboard | Actual account ingestion/query/dashboard and real Agent0 finding |
 | Radar | Partial: starter manifests, resource limits, protected deps and exact-version smoke | Owned cluster, deployed revision/image/URL, Checks and investigation-driven decision |
 | Gitar | Prepared rules/criteria/PR workflow | Actual App connection, reviewed PRs and answered findings |

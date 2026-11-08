@@ -189,9 +189,61 @@
   "not_run": [
     "inference/rerank",
     "post-fix twelve-source coverage sampler",
-    "browser against real Elasticsearch"
+    "completed live browser workflow against real Elasticsearch"
   ],
   "termination_reason": "system memory-pressure guard; owned services stopped and listeners clear",
+  "browser_attempt": {
+    "status": "stopped_host_memory_pressure",
+    "runtime": "existing Elasticsearch9.5.6/basic/512MiB; unchanged470 public records",
+    "no_api_interception": true,
+    "no_fake_clocks": true,
+    "browser_contexts": 1,
+    "initial_free_percent": 53,
+    "initial_kernel_pressure": 1,
+    "runtime_ready_at_utc": "2026-11-08T23:02:21Z",
+    "after_es_free_percent": 43,
+    "after_es_kernel_pressure": 1,
+    "supervisor_observed_nonnormal_pressure": true,
+    "exact_trigger_level": null,
+    "es_stopping_at_utc": "2026-11-08T23:02:35.242Z",
+    "es_closed_at_utc": "2026-11-08T23:02:37.538Z",
+    "completed_evidence": {
+      "initial_real_browse": {
+        "mode": "bm25",
+        "degraded": false,
+        "server_log_duration_ms": 566.8,
+        "benchmark": false
+      },
+      "app_and_facets_loaded": true,
+      "connection_loss_state_after_owned_shutdown": true
+    },
+    "not_run": [
+      "share-interest/watch acknowledgments",
+      "two full-report UI/API clients",
+      "actual15-second polling/durable alert/current counts",
+      "live Plan B browser flow",
+      "save/reload/ICS",
+      "post-fix12-source sampler"
+    ],
+    "screenshot": "real-es-pressure-stop.png",
+    "cleanup": {
+      "owned_process_groups": [
+        6373,
+        6455
+      ],
+      "owned_browser_pid": 6598,
+      "owned_pids_absent": true,
+      "ports19200_19300_18080_clear": true,
+      "private_env_deleted": true,
+      "preview8080_pid": 5220,
+      "preview8080_health": {
+        "ok": true,
+        "version": "1816851"
+      },
+      "final_free_percent": 51,
+      "final_kernel_pressure": 1
+    }
+  },
   "checked_in_catalog_sha256": "dcca48f7ac1e695151acce8a551b336ce22301752719025b0e73a5b0ec055c2f",
   "catalog_json_semantically_equal": true,
   "catalog_hash_note": "Raw bytes differ only in JSON serialization; parsed sources and all470 records are identical."

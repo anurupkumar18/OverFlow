@@ -25,8 +25,8 @@ Additional delivery findings:
 | Browser/backend telemetry leaked stable URL query attributes | Scrub stable and legacy attributes; inspect actual combined exports | Real local collector and scoped review |
 | Slow HTTP headers could evade socket timeout | Owned request process with wall deadline and cleanup | Real slow-header regression and scoped re-review |
 | Project enrichment might overwrite schedule facts | Preserve all original fields/tags; match only conservative exact project names | Independent470-record before/after and520-mention source audit |
-| ES|QL might return partial or incompatible observations | Typed complete-result validation and a bounded aggregation fallback |25 ES|QL cases and independent query/API review |
+| ES\|QL might return partial or incompatible observations | Typed complete-result validation and a bounded aggregation fallback |25 ES\|QL cases and independent query/API review |
 
-Final alert reviews closed durable-warning, stale-signal, pause/ack race and polling-focus findings. The Plan B coverage review closed misleading crowd-outage copy when only topic matching broadened. Scoped final reviews report no remaining Important/Critical finding; root independently ran integrated suites and17 browser scenarios.
+Final alert reviews closed durable-warning, stale-signal, pause/ack race and polling-focus findings. The Plan B coverage review closed misleading crowd-outage copy when only topic matching broadened. Scoped final reviews report no remaining Important/Critical finding; root independently ran integrated suites and 17 browser scenarios.
 
 The review did not establish remote service access, deployed state, real relevance metrics, container build success, or human acceptance. Those remain separate evidence requirements in `evidence-status.md`.
