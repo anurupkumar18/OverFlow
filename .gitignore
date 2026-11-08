@@ -9,3 +9,11 @@
 node_modules/
 npm-debug.log*
 .DS_Store
+
+.agent/
+.venv/
+.superpowers/
+.playwright-cli/
+output/playwright/
+__pycache__/
+*.pyc
