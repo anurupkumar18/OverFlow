@@ -9,6 +9,28 @@ const queries = {
   degraded_share: `sum(rate(overflow_search_degraded_total{${selector}}[5m])) / ${total}`,
 };
 
+async function readLimitedJson(response) {
+  const limit = 65536;
+  if (Number(response.headers.get('content-length')) > limit) {
+    await response.body?.cancel();
+    throw new Error('Metrics response too large');
+  }
+  if (!response.body) throw new Error('Empty metrics body');
+  const reader = response.body.getReader();
+  let bytes = 0;
+  const chunks = [];
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > limit) { await reader.cancel(); throw new Error('Metrics response too large'); }
+      chunks.push(Buffer.from(value));
+    }
+  } finally { reader.releaseLock(); }
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
 function createStatusProvider({ env = process.env, fetchImpl = globalThis.fetch, clock = Date.now } = {}) {
   let cached = unavailable();
   let expires = 0;
@@ -35,7 +57,7 @@ function createStatusProvider({ env = process.env, fetchImpl = globalThis.fetch,
             ttl = Number.isFinite(delay) ? Math.max(ttl, Math.min(delay, 300000)) : ttl;
           }
           if (!response.ok) throw new Error('Metrics unavailable');
-          const body = await response.json();
+          const body = await readLimitedJson(response);
           const samples = body?.data?.result;
           if (body.status !== 'success' || !Array.isArray(samples) || samples.length !== 1) throw new Error('No aggregate sample');
           const sample = Number(samples[0]?.value?.[1]);

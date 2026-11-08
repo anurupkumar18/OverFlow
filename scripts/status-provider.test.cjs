@@ -38,3 +38,10 @@ test('429 backoff honors Retry-After instead of continuously querying', async ()
   await read();
   assert.equal(calls, 2);
 });
+
+test('oversized metrics payload is unavailable instead of consuming an unbounded body', async () => {
+  const { createStatusProvider } = require('../app/status-provider.cjs');
+  const read = createStatusProvider({ env: { DASH0_API_URL:'https://dash.example', DASH0_READ_TOKEN:'secret' },
+    fetchImpl: async () => new Response(JSON.stringify({status:'success',data:{result:[{value:[1700000000,'0.1']}]},padding:'x'.repeat(70000)})) });
+  assert.equal((await read()).status, 'unavailable');
+});
