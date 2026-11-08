@@ -16,7 +16,7 @@ This is agent-operated verification, not human acceptance or proof of a remote d
 
 Playwright Chromium, desktop 1440×1000, mobile 390×844, narrow 320×780:
 
-- Search and empty-result recovery; day and track filters; pagination reaches beyond the first 100.
+- Search and empty-result recovery; day and track filters; final real-service pagination reached all 470 unique sessions, with no browser page errors.
 - Session detail and Plan B; three real alternatives for an observed test session.
 - Native dialog Escape and focus restoration; `/` focuses search outside text inputs.
 - Device-only saved plan survives reload; calendar download contains two selected QA events, CRLF lines and UTF-8 lines no longer than 75 octets.
