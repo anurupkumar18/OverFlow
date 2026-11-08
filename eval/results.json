@@ -1,0 +1,39 @@
+{
+  "n": 0,
+  "total_queries": 0,
+  "eligible_query_ids": [],
+  "excluded_incomplete": [],
+  "excluded_failed": [],
+  "excluded_no_relevant": [],
+  "arms": {
+    "bm25": {
+      "recall_at_10": null,
+      "mrr": null,
+      "p95_ms": null,
+      "latency_samples": 0,
+      "unjudged_results_at_10": 0
+    },
+    "semantic": {
+      "recall_at_10": null,
+      "mrr": null,
+      "p95_ms": null,
+      "latency_samples": 0,
+      "unjudged_results_at_10": 0
+    },
+    "hybrid": {
+      "recall_at_10": null,
+      "mrr": null,
+      "p95_ms": null,
+      "latency_samples": 0,
+      "unjudged_results_at_10": 0
+    },
+    "hybrid_rerank": {
+      "recall_at_10": null,
+      "mrr": null,
+      "p95_ms": null,
+      "latency_samples": 0,
+      "unjudged_results_at_10": 0
+    }
+  },
+  "interpretation": "Recall@10 uses relevant documents in the top-5-per-arm judged pool, not corpus-wide recall. MRR is truncated at 10 and uses judged relevant items; unjudged results stay unknown. Complete human query pools and successful runs for all four arms are required; queries with no judged relevant items are excluded. Latency is client-observed per request, nearest-rank p95 on included queries only."
+}

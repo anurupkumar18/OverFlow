@@ -1,0 +1,25 @@
+{
+  "status": "agent-drafted suggestions, not participant approved; not used by pool.py",
+  "queries": [
+    {"id":"q01","text":"Reduce Kubernetes infrastructure costs without hurting reliability"},
+    {"id":"q02","text":"OpenTelemetry tracing in a production system"},
+    {"id":"q03","text":"Build a useful internal developer platform"},
+    {"id":"q04","text":"Secure AI agents running on Kubernetes"},
+    {"id":"q05","text":"GPU sharing and resource scheduling"},
+    {"id":"q06","text":"GitOps deployment rollback with Argo CD"},
+    {"id":"q07","text":"Learn Kubernetes as a beginner"},
+    {"id":"q08","text":"Operate a multi-cluster fleet"},
+    {"id":"q09","text":"Debug networking problems with eBPF"},
+    {"id":"q10","text":"Policy enforcement and admission control"},
+    {"id":"q11","text":"Stateful data processing on Kubernetes"},
+    {"id":"q12","text":"Improve incident response with operational context"},
+    {"id":"q13","text":"LLM inference routing and caching"},
+    {"id":"q14","text":"Manage software supply chain risk"},
+    {"id":"q15","text":"Make metrics cardinality manageable"},
+    {"id":"q16","text":"Contribute to a CNCF open source project"},
+    {"id":"q17","text":"Autoscaling for unpredictable workloads"},
+    {"id":"q18","text":"Accessible and inclusive cloud native communities"},
+    {"id":"q19","text":"Measure platform reliability with SLOs"},
+    {"id":"q20","text":"Lessons from operating Kubernetes in production"}
+  ]
+}
