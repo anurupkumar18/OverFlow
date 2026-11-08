@@ -10,6 +10,18 @@ let requests;
 let degraded;
 let duration;
 
+function httpTelemetryAttributes(request) {
+  const raw=request?.url || request?.path || '/';
+  let parsed;
+  try { parsed=new URL(raw,request?.origin || 'http://redacted.invalid'); } catch { parsed=new URL('http://redacted.invalid/REDACTED'); }
+  let route=parsed.pathname;
+  if (/^\/api\/(talks|planb)\/[^/]+$/.test(route)) route=route.replace(/\/[^/]+$/,'/:id');
+  else if (!['/','/index.html','/styles.css','/favicon.svg','/healthz','/readyz','/api/search','/api/config','/api/status','/api/interactions','/api/subscriptions','/api/alerts','/api/deps','/api/admin/mode','/js/app.js','/js/api.js','/js/icons.js','/js/telemetry.js','/generated/telemetry-sdk.js'].includes(route)) route='/REDACTED';
+  const full=parsed.origin==='http://redacted.invalid'?route:parsed.origin+route;
+  return {'http.target':route,'http.url':full,'url.full':full,'url.path':route,'url.query':'','url.fragment':''};
+}
+function scrubHttpSpan(span,request) { span.setAttributes(httpTelemetryAttributes(request)); }
+
 if (enabled) {
   api = require('@opentelemetry/api');
   logApi = api; // Logs are part of the stable API in @opentelemetry/api 1.10+.
@@ -30,13 +42,12 @@ if (enabled) {
     '@opentelemetry/instrumentation-dns': { enabled: false },
     '@opentelemetry/instrumentation-http': {
       ignoreIncomingRequestHook: req => ['/healthz', '/readyz'].includes(req.url?.split('?')[0]),
-      requestHook(span, req) {
-        // Keep query text, attendee ids and credentials out of span attributes.
-        if (req.url) {
-          span.setAttribute('http.target', req.url.split('?')[0]);
-          span.setAttribute('http.url', req.url.split('?')[0]);
-        }
-      },
+      // Current instrumentation emits stable url.* fields as well as legacy http.*.
+      requestHook:scrubHttpSpan,
+      applyCustomAttributesOnSpan:scrubHttpSpan,
+    },
+    '@opentelemetry/instrumentation-undici': {
+      requestHook:scrubHttpSpan,
     },
   })] });
   sdk.start();
@@ -82,4 +93,4 @@ async function withStage(name, fn) {
 
 async function shutdownTelemetry() { if (sdk) await sdk.shutdown(); }
 
-module.exports = { observe, withStage, searchLog, shutdownTelemetry };
+module.exports = { observe, withStage, searchLog, shutdownTelemetry, httpTelemetryAttributes };

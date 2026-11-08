@@ -19,3 +19,18 @@ test('stage wrapper returns result and preserves rejection without serializing e
   const error = new Error('private upstream response');
   await assert.rejects(withStage('semantic', async () => { throw error; }), e => e === error);
 });
+
+test('HTTP telemetry sanitizes stable and legacy URL attributes for incoming and outgoing requests',()=>{
+  const { httpTelemetryAttributes }=require('../app/telemetry.cjs');
+  for(const request of [
+    {url:'/api/search?q=private-query&attendee_id=private-id'},
+    {url:'/api/talks/private-id?key=private-key'},
+    {path:'/private-id?key=private-key',origin:'https://user:private-key@example.test'},
+  ]) {
+    const attrs=httpTelemetryAttributes(request);
+    assert.ok(!JSON.stringify(attrs).includes('private-'));
+    assert.equal(attrs['url.query'],'');assert.equal(attrs['url.fragment'],'');
+  }
+  assert.equal(httpTelemetryAttributes({url:'/api/talks/id'})['url.path'],'/api/talks/:id');
+  assert.equal(httpTelemetryAttributes({url:'/api/search?q=test'})['http.target'],'/api/search');
+});

@@ -14,3 +14,7 @@
 | User chose earth tones + one accent | Direct palette response during build | Keeping an inferred blue surface palette |
 
 All implementation decisions except the explicit start-now and palette instructions are agent choices, not attributed to the user.
+
+## Plan B coverage in the real local index
+
+Elasticsearch9.5.6 returned no strict MLT result for11 of12 sampled real sessions, despite time/room-eligible candidates. Preserve strict nonempty results. Only after a complete empty response, retry a broader10% lexical threshold within the existing stage deadline and all safety filters. Disclose broader-topic matches and degraded status when that retry supplies results. A failed or empty broader attempt preserves the valid strict empty result. This is a candidate-coverage policy; relevance quality remains unmeasured without human labels.

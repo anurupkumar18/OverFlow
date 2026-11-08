@@ -110,7 +110,8 @@
             }
           }
         },
-        "description": "When a subsequent page changes mode/order, discard that offset page and refresh offset zero with the new mode ceiling. Pin that ceiling until a new search; do not append incompatible rankings. Each refresh starts once without recursive page retries."
+        "description": "When a subsequent page changes mode/order, discard that offset page and refresh offset zero with the new mode ceiling. Pin that ceiling until a new search; do not append incompatible rankings. Each refresh starts once without recursive page retries.",
+        "x-caller": "browser"
       }
     },
     "/api/talks/{id}": {
@@ -167,7 +168,8 @@
               }
             }
           }
-        }
+        },
+        "x-caller": "browser"
       }
     },
     "/api/planb/{id}": {
@@ -224,7 +226,8 @@
               }
             }
           }
-        }
+        },
+        "x-caller": "browser"
       }
     },
     "/api/config": {
@@ -270,7 +273,8 @@
               }
             }
           }
-        }
+        },
+        "x-caller": "browser"
       }
     },
     "/api/status": {
@@ -316,7 +320,8 @@
               }
             }
           }
-        }
+        },
+        "x-caller": "browser"
       }
     },
     "/api/alerts": {
@@ -373,7 +378,8 @@
             }
           }
         },
-        "description": "Requires complete subscription search and crowd aggregations. Timed-out, failed-shard, truncated/inexact or malformed subscription hits yield 503 unavailable, never a verified empty alert list. Requests beyond the bounded 1000-subscription result limit remain unavailable."
+        "description": "Requires complete subscription search and crowd aggregations. Timed-out, failed-shard, truncated/inexact or malformed subscription hits yield 503 unavailable, never a verified empty alert list. Requests beyond the bounded 1000-subscription result limit remain unavailable.",
+        "x-caller": "browser"
       }
     },
     "/api/interactions": {
@@ -452,7 +458,8 @@
               }
             }
           }
-        }
+        },
+        "x-caller": "browser"
       }
     },
     "/api/subscriptions": {
@@ -523,7 +530,8 @@
               }
             }
           }
-        }
+        },
+        "x-caller": "browser"
       }
     },
     "/api/deps": {
@@ -541,7 +549,8 @@
           "401": {
             "description": "Unauthorized"
           }
-        }
+        },
+        "x-caller": "internal"
       }
     },
     "/api/admin/mode": {
@@ -614,7 +623,8 @@
               }
             }
           }
-        }
+        },
+        "x-caller": "internal"
       }
     },
     "/healthz": {
@@ -661,7 +671,8 @@
               }
             }
           }
-        }
+        },
+        "x-caller": "internal"
       }
     },
     "/readyz": {
@@ -708,7 +719,8 @@
               }
             }
           }
-        }
+        },
+        "x-caller": "internal"
       }
     }
   },
@@ -1036,7 +1048,8 @@
           "version",
           "live_interactions",
           "event",
-          "data_source"
+          "data_source",
+          "browser_rum"
         ],
         "properties": {
           "version": {
@@ -1059,6 +1072,52 @@
           "data_source": {
             "type": "object",
             "description": "Verified public catalog provenance; includes name, URL, retrieval time and capacity policy."
+          },
+          "browser_rum": {
+            "description": "Disabled unless explicitly configured. Only a dedicated ingest-only browser token is public; server credentials are never included.",
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "enabled"
+                ],
+                "properties": {
+                  "enabled": {
+                    "const": false
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "enabled",
+                  "endpoint",
+                  "token",
+                  "dataset",
+                  "environment"
+                ],
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  },
+                  "endpoint": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "token": {
+                    "type": "string"
+                  },
+                  "dataset": {
+                    "type": "string"
+                  },
+                  "environment": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
           }
         }
       },

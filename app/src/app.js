@@ -2,6 +2,9 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const {snapshotSearch,normalizeTalk,planB,facets} = require('./schedule');
+const {PlanBRankingUnavailable} = require('./elasticsearch');
+const {browserTelemetryConfig} = require('./browser-telemetry');
+const {ROUTES,allowedMethods} = require('./routes');
 const MAX_BODY=16384;
 class HttpError extends Error { constructor(status,message) {super(message);this.status=status;} }
 function string(value,label,max=160) {if(typeof value!=='string'||!value.trim()||value.length>max) throw new HttpError(400,`Invalid ${label}.`);return value.trim();}
@@ -34,6 +37,7 @@ function createApp({catalog,env=process.env,clock=Date.now,es=null,statusProvide
  if(!catalog||!Array.isArray(catalog.talks)||!catalog.talks.length)throw new Error('A nonempty verified catalog is required.');
  const talks=catalog.talks.map(t=>normalizeTalk({...t,fullness:undefined})); const byId=new Map(talks.map(t=>[t.id,t]));
  const version=env.APP_VERSION||'dev';const source=catalog.source;
+ const browserRum=browserTelemetryConfig(env);
  const engine=es; const fallbackReason='Live search is unavailable; browsing the verified schedule snapshot.';
  async function query(filters) {
    if(filters.mode!=='snapshot'&&engine?.searchTalks){try{return {...await engine.searchTalks(filters,talks),source,version,facets:facets(talks)};}catch{/* Snapshot fallback never exposes provider errors. */}}
@@ -50,6 +54,7 @@ function createApp({catalog,env=process.env,clock=Date.now,es=null,statusProvide
   try{
    if((req.url||'').length>4096)throw new HttpError(414,'URL too long.');
    const url=new URL(req.url,'http://localhost');const pathname=url.pathname;
+   if(pathname.startsWith('/api/')||pathname==='/healthz'||pathname==='/readyz'){const methods=allowedMethods(pathname);if(!methods.length)throw new HttpError(404,'API route not found.');if(!methods.includes(req.method))throw new HttpError(405,'Method not allowed.');}
    if(pathname==='/healthz'||pathname==='/readyz'){route=pathname;return send(200,{ok:true,version});}
    if(pathname==='/api/deps'||pathname==='/api/admin/mode'){if(!authorized(req,env.ADMIN_TOKEN))throw new HttpError(401,'Internal route requires a valid bearer token.');}
    if(req.method==='GET'&&pathname==='/api/search'){route='/api/search';return send(200,await query(searchFilters(url)));}
@@ -57,12 +62,17 @@ function createApp({catalog,env=process.env,clock=Date.now,es=null,statusProvide
     const [, ,kind,encoded]=pathname.split('/');route=`/api/${kind}/:id`;let talkId;try{talkId=id(decodeURIComponent(encoded));}catch{throw new HttpError(400,'Invalid talk id.');}
     const current=await one(talkId);if(kind==='talks')return send(200,current);
     let candidates=talks, mode='snapshot',degraded=true,reason=fallbackReason;
-    if(engine?.planBCandidates){try{const result=await engine.planBCandidates(current.item);candidates=result.items;mode=result.mode;degraded=result.degraded;reason=result.reason||null;}catch{}}
-    const items=planB(current.item,candidates,new Date(clock()));
+    if(engine?.planBCandidates){try{const result=await engine.planBCandidates(current.item);candidates=result.items;mode=result.mode;degraded=result.degraded;reason=result.reason||null;}catch(error){
+     if(error instanceof PlanBRankingUnavailable&&error.fullnessById.size){
+      candidates=error.snapshotCandidates(talks);
+      reason='Live Plan B ranking is unavailable; using the verified schedule snapshot and retaining verified crowd observations.';
+     }
+    }}
+    const items=planB(current.item,candidates,new Date(clock()),{ranked:mode!=='snapshot'});
     if(items.some(t=>t.fullness.signal==='unavailable'))reason=[reason,'Crowd state is unknown; these alternatives are not confirmed available.'].filter(Boolean).join(' ');
     return send(200,{items,mode,degraded,reason,source_talk:current.item});
    }
-   if(req.method==='GET'&&pathname==='/api/config'){route=pathname;let live=false;try{live=Boolean(await engine?.available?.());}catch{}return send(200,{version,live_interactions:live,event:{name:'KubeCon + CloudNativeCon North America 2026',timezone:'America/Denver'},data_source:source});}
+   if(req.method==='GET'&&pathname==='/api/config'){route=pathname;let live=false;try{live=Boolean(await engine?.available?.());}catch{}return send(200,{version,live_interactions:live,event:{name:'KubeCon + CloudNativeCon North America 2026',timezone:'America/Denver'},data_source:source,browser_rum:browserRum});}
    if(req.method==='GET'&&pathname==='/api/status'){route=pathname;let status=null;try{status=await statusProvider?.();}catch{}const valid=verifiedStatus(status);return send(200,{status:valid?'available':'unavailable',p95_ms:valid?status.p95_ms:null,error_ratio:valid?status.error_ratio:null,degraded_share:valid?status.degraded_share:null,as_of:valid?status.as_of:null,version,search_mode:engine?.mode||'snapshot'});}
    if(req.method==='GET'&&pathname==='/api/deps') {
     route=pathname;
@@ -90,8 +100,8 @@ function createApp({catalog,env=process.env,clock=Date.now,es=null,statusProvide
    if(!filename.startsWith(path.resolve(publicDir)+path.sep))throw new HttpError(404,'Not found.');
    const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.webp':'image/webp'}[path.extname(filename)];if(!mime)throw new HttpError(404,'Not found.');
    let content;try{const real=await fs.realpath(filename);if(!real.startsWith(await fs.realpath(publicDir)+path.sep))throw Error();content=await fs.readFile(real);}catch{throw new HttpError(404,'Not found.');}
-   res.writeHead(200,{'content-type':mime,'x-content-type-options':'nosniff','referrer-policy':'no-referrer','content-security-policy':"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"});res.end(req.method==='HEAD'?undefined:content);
+   res.writeHead(200,{'content-type':mime,'x-content-type-options':'nosniff','referrer-policy':'no-referrer','content-security-policy':`default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'${browserRum.enabled?' '+browserRum.endpoint:''}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'`});res.end(req.method==='HEAD'?undefined:content);
   }catch(error){if(!res.headersSent)send(error.status||503,{error:error instanceof HttpError?error.message:'Service dependency is unavailable. Please try again.'});else res.end();}
  };
 }
-module.exports={createApp,HttpError};
+module.exports={createApp,HttpError,ROUTES};

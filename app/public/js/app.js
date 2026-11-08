@@ -1,4 +1,6 @@
 import { api } from './api.js';
+import { telemetry } from './telemetry.js';
+import { createAlertWatcher } from './alerts.js';
 import { icon } from './icons.js';
 
 const $ = (selector, scope = document) => scope.querySelector(selector);
@@ -10,12 +12,14 @@ const shortDayFormat = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekda
 const dateKeyFormat = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' });
 const storageKey = 'overflow.personal-plan.v1';
 const interestStorageKey = 'overflow.shared-interest.v1';
+const alertMarkupCache = new WeakMap();
 const state = {
   filters: { q: '', day: '', track: '', available: false },
   items: new Map(), saved: new Map(), sharedInterest: new Set(), config: null, mode: null, view: 'discover',
   searchSequence: 0, dialogSequence: 0, searchController: null, dialogController: null,
   debounce: null, toastTimer: null, dialogSource: null, lastFocus: null, storageAvailable: true,
   loaded: [], nextOffset: null, paginationMode: null, total: 0, facetDays: '', completedFilters: null,
+  alertWatcher: null, alertSnapshot: null,
 };
 
 function time(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Time unavailable' : timeFormat.format(date); }
@@ -75,7 +79,8 @@ function signalCountsText(talk) {
 }
 function refreshRoomSignals(talk) {
   cacheTalk(talk);
-  if (state.saved.has(String(talk.id))) renderPersonalPlan();
+  state.loaded = state.loaded.map(item => String(item.id) === String(talk.id) ? talk : item);
+  // Update observations in place so polling never replaces saved-plan or rail controls.
   document.querySelectorAll('[data-talk-id]').forEach((element) => {
     if (element.dataset.talkId !== String(talk.id)) return;
     const signal = $('.room-signal', element);
@@ -222,7 +227,7 @@ function updateNotice(data) {
   const notice = $('#catalog-notice');
   notice.classList.toggle('is-live', live && !data.degraded);
   $('#notice-icon').innerHTML = icon(live ? 'signal' : 'offline');
-  $('#notice-title').textContent = snapshot ? 'Offline catalog · Live room signals unavailable' : data.degraded ? 'Search is running with limited connections' : live ? 'Conference catalog · Live crowd signals enabled' : 'Conference catalog · Live room signals unavailable';
+  $('#notice-title').textContent = snapshot ? 'Snapshot search · Live search unavailable' : data.degraded ? 'Search is running with limited connections' : live ? 'Search results · Current crowd signals included' : 'Search results · Crowd signals unknown';
   const reason = data.reason || (snapshot ? 'Using the offline schedule. Capacities are planning estimates.' : data.degraded ? 'Some services are unavailable; results use a fallback.' : live ? 'Crowd signals indicate interest, not occupancy. Capacities are estimates.' : 'Explore the schedule and save your own plan. Capacities are estimates.');
   $('#notice-description').textContent = `Mode: ${data.mode || 'unknown'} · ${data.degraded ? 'Limited service' : 'Connected catalog'}. ${reason}`;
   $('#available-filter').disabled = !live;
@@ -356,8 +361,9 @@ async function openDetails(id) {
       <div class="dialog-actions"><button class="button button-primary dialog-save" type="button" data-action="save" data-id="${escapeHtml(talk.id)}" aria-pressed="${saved}" aria-label="${saved ? 'Remove' : 'Save'} ${escapeHtml(talk.title)}${saved ? ' from' : ' to'} my plan">${icon(saved ? 'check' : 'bookmark')} ${saved ? 'Saved to my plan' : 'Save to my plan'}</button><button class="button button-secondary" type="button" data-action="planb" data-id="${escapeHtml(talk.id)}">${icon('route')} Find a Plan B</button></div>
       <p class="dialog-footnote">Saved only on this device. A personal save does not reserve a seat.</p>
       ${sourceUrl ? `<a class="dialog-source" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">View official session ${icon('external')}</a>` : '<p class="dialog-footnote">An official session link is not available.</p>'}
-      ${live ? `<section class="live-actions"><h3>Help fellow attendees</h3><p>Share interest as a live crowd signal, separate from your personal plan. Interest is not a reservation or a headcount. Report a full room only when you observe it.</p><div class="live-actions-buttons"><button class="button button-secondary interest-button" type="button" data-action="share-interest" data-id="${escapeHtml(talk.id)}" aria-pressed="${state.sharedInterest.has(String(talk.id))}">${icon(state.sharedInterest.has(String(talk.id)) ? 'check' : 'signal')} ${state.sharedInterest.has(String(talk.id)) ? 'Withdraw interest' : 'Share interest'}</button><button class="button button-secondary" type="button" data-action="report-full" data-id="${escapeHtml(talk.id)}">${icon('alert')} Report room full</button><button class="button button-secondary" type="button" data-action="subscribe" data-id="${escapeHtml(talk.id)}">${icon('bell')} Check room alerts</button></div><p id="live-feedback" class="live-feedback" role="status"></p></section>` : ''}
+      ${live ? `<section class="live-actions"><h3>Help fellow attendees</h3><p>Share interest as a live crowd signal, separate from your personal plan. Interest is not a reservation or a headcount. Report a full room only when you observe it.</p><div class="live-actions-buttons"><button class="button button-secondary interest-button" type="button" data-action="share-interest" data-id="${escapeHtml(talk.id)}" aria-pressed="${state.sharedInterest.has(String(talk.id))}">${icon(state.sharedInterest.has(String(talk.id)) ? 'check' : 'signal')} ${state.sharedInterest.has(String(talk.id)) ? 'Withdraw interest' : 'Share interest'}</button><button class="button button-secondary" type="button" data-action="report-full" data-id="${escapeHtml(talk.id)}">${icon('alert')} Report room full</button><button class="button button-secondary" type="button" data-action="subscribe" data-id="${escapeHtml(talk.id)}">${icon('bell')} Watch room</button></div><p id="live-feedback" class="live-feedback" role="status"></p></section>` : ''}
     </div>`;
+    renderWatchControls();
     $('.dialog-close').focus();
   } catch (error) { if (error.name !== 'AbortError' && sequence === state.dialogSequence) renderDialogError(error.message, 'details', id); }
 }
@@ -369,6 +375,7 @@ async function openPlanB(id) {
     if (sequence !== state.dialogSequence) return;
     const source = data.source_talk || findTalk(id);
     const items = (Array.isArray(data.items) ? data.items : []).slice(0, 3);
+    const crowdNote = !items.length ? 'No room signals are available for this result.' : items.every(talk => talk.fullness?.signal === 'live') ? 'Crowd signals are estimates.' : 'Live room signals are unavailable for some or all options.';
     items.forEach(cacheTalk);
     if (source) cacheTalk(source);
     renderPersonalPlan();
@@ -379,8 +386,8 @@ async function openPlanB(id) {
       <p class="dialog-subheading">Plan B for <strong>${escapeHtml(source?.title || 'your session')}</strong>${source ? `, ${escapeHtml(time(source.start))} on ${escapeHtml(day(source.start, true))}` : ''}.</p>
     </div><div class="dialog-body">
       ${responseStatusMarkup(data)}
-      <p class="planb-note">Starting within 10 minutes, in a different room. Nearby floors are preferred when known; check the venue before walking. ${data.mode === 'snapshot' || data.degraded ? 'Live room signals are unavailable for some or all options. A seat is not guaranteed.' : 'Crowd signals are estimates. A seat is not guaranteed.'}</p>
-      <div class="planb-list">${items.length ? items.map((talk) => rowMarkup(talk, { alternative: true })).join('') : emptyMarkup('No good backup in this window.', 'There are no eligible sessions starting within 10 minutes in another room. Try exploring a different time in the schedule.', '', '', 'route')}</div>
+      <p class="planb-note">Starting within 10 minutes, in a different room. Nearby floors are preferred when known; check the venue before walking. ${crowdNote} A seat is not guaranteed.</p>
+      <div class="planb-list">${items.length ? items.map((talk) => rowMarkup(talk, { alternative: true })).join('') : emptyMarkup('No good backup in this window.', 'No matching alternatives were returned for this session. Try exploring a different time or topic in the schedule.', '', '', 'route')}</div>
       <p class="dialog-footnote">${data.mode === 'snapshot' ? 'Offline catalog. ' : ''}Unknown room signals remain eligible and are labeled. Unknown floors never count as a floor match.</p>
     </div>`;
     $('.dialog-close').focus();
@@ -401,6 +408,67 @@ function attendeeId() {
     if (!id || !/^[a-zA-Z0-9_-]{8,80}$/.test(id)) { id = crypto.randomUUID(); localStorage.setItem(key, id); }
     return id;
   } catch { return state.sessionAttendee ||= crypto.randomUUID(); }
+}
+function watchStatusText(value) {
+  if (!value?.watched.length) return '';
+  if (value.status === 'paused') return 'Room alerts paused in this tab. Your saved room watches remain.';
+  if (value.status === 'hidden') return 'Room checks paused while this tab is hidden. They resume when you return.';
+  if (value.status === 'unavailable') return `Room alerts unavailable. Retrying in ${value.retry_ms / 1000} seconds; no all-clear is assumed.`;
+  if (value.status === 'checking') return 'Checking room alerts… Checks repeat every 15 seconds while this tab is visible.';
+  return `Watching ${value.watched.length} room${value.watched.length === 1 ? '' : 's'}. ${value.items.length ? `${value.items.length} room alert${value.items.length === 1 ? '' : 's'}.` : 'No full-room alerts at the last check.'} Checking every 15 seconds while this tab is visible.`;
+}
+function renderWatchControls() {
+  const value = state.alertSnapshot;
+  const watching = Boolean(value?.watched.length);
+  const bar = $('#room-watch-controls');
+  if (bar) bar.hidden = !watching;
+  const modalPanel = $('#modal-room-alerts');
+  if (modalPanel) modalPanel.hidden = !watching;
+  document.querySelectorAll('[data-watch-status]').forEach(node => { node.textContent = watchStatusText(value); });
+  document.querySelectorAll('[data-action="toggle-alerts"]').forEach(button => { button.textContent = value?.active ? 'Pause alerts in this tab' : 'Resume room alerts'; });
+  const alerts = value?.items || [];
+  const markup = alerts.length ? `${value.status !== 'watching' ? '<p class="room-alert-stale">Last observed alerts. Room signals may have changed.</p>' : ''}<ul class="room-alert-list">${alerts.map(alert => `<li data-room-alert-id="${escapeHtml(alert.talk_id)}"><div><strong>${escapeHtml(alert.title)}</strong><p>${escapeHtml(alert.message)}</p></div><div class="room-alert-actions"><button class="button button-secondary" type="button" data-action="details" data-id="${escapeHtml(alert.talk_id)}" aria-label="Details for ${escapeHtml(alert.title)}">Details</button><button class="button button-secondary" type="button" data-action="planb" data-id="${escapeHtml(alert.talk_id)}" aria-label="Plan B for ${escapeHtml(alert.title)}">${icon('route')} Plan B</button></div></li>`).join('')}</ul>` : '';
+  document.querySelectorAll('[data-room-alert-list]').forEach(node => {
+    node.hidden = !alerts.length;
+    if (alertMarkupCache.get(node) === markup) return;
+    const focused = document.activeElement;
+    const restore = focused?.closest?.('[data-room-alert-list]') === node ? {id:focused.dataset.id,action:focused.dataset.action} : null;
+    node.innerHTML = markup; alertMarkupCache.set(node, markup);
+    if (restore) (node.querySelector(`[data-action="${restore.action}"][data-id="${restore.id}"]`) || ($('#talk-dialog').open ? $('.dialog-close') : $('#room-watch-controls [data-action="toggle-alerts"]')))?.focus();
+  });
+  document.querySelectorAll('[data-action="subscribe"]').forEach(button => {
+    const watched = value?.watched.includes(button.dataset.id);
+    button.disabled = Boolean(watched);
+    button.innerHTML = `${icon('bell')} ${watched ? 'Room watched' : 'Watch room'}`;
+  });
+}
+function roomWatcher() {
+  if (!state.alertWatcher) state.alertWatcher = createAlertWatcher({
+    fetchAlerts: (id, signal) => api.alerts(id, signal), visible: document.visibilityState !== 'hidden',
+    onState: value => {
+      const previous = state.alertSnapshot;
+      if (value.status === 'watching') {
+        const current = new Set(value.items.map(alert => alert.talk_id));
+        for (const alert of value.items) { const talk = findTalk(alert.talk_id); if (talk) refreshRoomSignals({...talk,fullness:alert.fullness}); }
+        for (const alert of previous?.items || []) { const talk = findTalk(alert.talk_id); if (talk && !current.has(alert.talk_id)) refreshRoomSignals(personalSnapshot(talk)); }
+      } else if (['unavailable','paused','hidden'].includes(value.status)) {
+        for (const id of value.watched) { const talk = findTalk(id); if (talk) refreshRoomSignals(personalSnapshot(talk)); }
+      }
+      state.alertSnapshot = value; renderWatchControls();
+      if (value.status === 'unavailable' && previous?.status !== 'unavailable') notifyRoomAlerts('Room alerts are unavailable. Checks will retry automatically.');
+    },
+    onAlerts: alerts => notifyRoomAlerts(alerts.slice(0, 3).map(alert => `${alert.title}: ${alert.message}`).join(' ') + (alerts.length > 3 ? ` ${alerts.length - 3} more watched rooms have alerts.` : '')),
+  });
+  return state.alertWatcher;
+}
+function notifyRoomAlerts(message) {
+  announce(message);
+  const modalStatus = $('#dialog-room-alert-status');
+  if ($('#talk-dialog').open && modalStatus) modalStatus.textContent = message;
+}
+function toggleRoomAlerts() {
+  if (!state.alertWatcher) return;
+  if (state.alertSnapshot?.active) state.alertWatcher.pause(); else state.alertWatcher.resume();
 }
 async function liveAction(button, type, id) {
   button.disabled = true;
@@ -424,13 +492,15 @@ async function liveAction(button, type, id) {
       if (feedback?.isConnected) feedback.textContent = 'Full-room report sent. Thank you for sharing what you observed.';
       announce('Full-room report sent.');
     } else {
-      await api.subscribe({ talk_id: id, attendee_id });
-      const alerts = await api.alerts(attendee_id);
-      if (feedback?.isConnected) feedback.textContent = alerts.items?.length ? alerts.items.map((alert) => `${alert.item?.title || 'Watched session'}: ${alert.message || 'A room alert is available.'}`).join(' ') : 'No full-room alerts for your watched sessions right now. Alerts are checked on request; check again before walking.';
-      announce('Room alerts checked.');
+      const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 8000);
+      try { await api.subscribe({ talk_id: id, attendee_id }, controller.signal); }
+      finally { clearTimeout(timeout); }
+      const activate = state.alertSnapshot?.active ?? true;
+      roomWatcher().watch(String(id), attendee_id, {activate});
+      if (feedback?.isConnected) feedback.textContent = activate ? 'Room watch saved. You can pause notifications in this tab at any time.' : 'Room watch saved. Alerts remain paused in this tab until you resume.';
     }
-  } catch (error) { if (feedback?.isConnected) feedback.textContent = error.message; announce(error.message); }
-  finally { if (button.isConnected) button.disabled = false; }
+  } catch (error) { const message = error.name === 'AbortError' ? 'The request timed out. Please try again.' : error.message; if (feedback?.isConnected) feedback.textContent = message; announce(message); }
+  finally { if (button.isConnected) button.disabled = false; if (type === 'subscribe') renderWatchControls(); }
 }
 
 function exportCalendar() {
@@ -493,6 +563,7 @@ function initEvents() {
     else if (action === 'reset') resetFilters();
     else if (action === 'retry') search();
     else if (action === 'discover') switchView('discover', { focus: true });
+    else if (action === 'toggle-alerts') toggleRoomAlerts();
     else if (action === 'report-full' || action === 'subscribe' || action === 'share-interest') liveAction(button, action, id);
   });
   const dialog = $('#talk-dialog');
@@ -504,6 +575,9 @@ function initEvents() {
     }
   });
   window.addEventListener('hashchange', () => switchView(location.hash === '#plan' ? 'plan' : 'discover'));
+  document.addEventListener('visibilitychange', () => state.alertWatcher?.setVisible(document.visibilityState !== 'hidden'));
+  window.addEventListener('pagehide', () => state.alertWatcher?.setVisible(false));
+  window.addEventListener('pageshow', () => state.alertWatcher?.setVisible(document.visibilityState !== 'hidden'));
   window.addEventListener('storage', (event) => {
     if (event.key === storageKey || event.key === null) { state.saved.clear(); loadSaved(); renderPersonalPlan(); }
     if (event.key === interestStorageKey || event.key === null) { loadSharedInterest(); reconcileInterestControls(); }
@@ -513,7 +587,7 @@ function initEvents() {
 async function init() {
   initIcons(); loadSaved(); loadSharedInterest(); renderPersonalPlan(); initEvents();
   switchView(location.hash === '#plan' ? 'plan' : 'discover');
-  const configPromise = api.config().then((config) => { state.config = config; if (state.mode) updateNotice(state.noticeData); }).catch(() => { state.config = { live_interactions: false }; });
+  const configPromise = api.config().then((config) => { state.config = config; if (state.mode) updateNotice(state.noticeData); void telemetry.start(config.browser_rum,config.version); }).catch(() => { state.config = { live_interactions: false }; });
   // Health is informative, never a gate that prevents reading the schedule.
   const statusPromise = api.status().then(renderServiceHealth).catch(() => renderServiceHealth({ status: 'unavailable' }));
   await Promise.allSettled([configPromise, statusPromise, search()]);

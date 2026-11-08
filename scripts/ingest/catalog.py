@@ -1,6 +1,7 @@
 """Public Sessionize normalization. No third-party dependencies or raw-page output."""
 import argparse
 import collections
+import copy
 import datetime as dt
 import hashlib
 import json
@@ -8,11 +9,22 @@ import math
 from pathlib import Path
 import re
 import urllib.request
+import urllib.error
 from zoneinfo import ZoneInfo
 
 API = 'https://sessionize.com/api/v2/svi82w6c/view/All'
 PAGE = 'https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/program/schedule/'
 DENVER = ZoneInfo('America/Denver')
+LANDSCAPE = 'https://landscape.cncf.io/api/projects/all.json'
+LANDSCAPE_SCHEMA = 'https://github.com/cncf/landscape2/blob/main/crates/cli/src/build/api.rs'
+MAX_DERIVED_PROJECTS = 6
+# Deliberate precision tradeoff: ordinary words are not reliable project evidence.
+AMBIGUOUS_PROJECT_NAMES = frozenset(name.casefold() for name in (
+    'Armada', 'Atlantis', 'Backstage', 'Capsule', 'Carina', 'Cartography', 'Cedar',
+    'Contour', 'Cortex', 'Distribution', 'Dragonfly', 'Envoy', 'Eraser', 'Fluid',
+    'Harbor', 'Headlamp', 'Interlink', 'Kepler', 'Litmus', 'Longhorn', 'Pixie',
+    'Porter', 'Praxis', 'Radius', 'Score', 'Spin', 'Stacker', 'Submariner', 'Tremor',
+    'Trickster', 'Volcano'))
 
 
 def utc(value):
@@ -121,25 +133,118 @@ def normalize(raw, capacity=200, retrieved_at=None, raw_sha256=None):
     return result
 
 
+def enrich_landscape(catalog, body, retrieved_at=None):
+    """Append bounded exact project-name mentions; never infer affiliation/relevance."""
+    validate(catalog)
+    if not isinstance(body, bytes) or not body or len(body) > 5_000_000:
+        raise ValueError('missing or oversized landscape project source')
+    try:
+        rows = json.loads(body)
+    except (ValueError, UnicodeError) as error:
+        raise ValueError('invalid landscape project JSON') from error
+    if not isinstance(rows, list) or not rows or len(rows) > 2000:
+        raise ValueError('landscape project source requires a nonempty bounded array')
+    projects, seen = [], set()
+    for row in rows:
+        if not isinstance(row, dict) or any(not isinstance(row.get(key), str) or not row[key].strip() for key in ('id', 'name')):
+            raise ValueError('landscape project record requires id and name')
+        identifier, name = row['id'], row['name']
+        if identifier in seen:
+            raise ValueError('duplicate landscape project id')
+        seen.add(identifier)
+        if (row.get('maturity') not in ('graduated', 'incubating', 'sandbox') or row.get('archived_at')
+                or row.get('oss') is not True or len(name) < 5 or name.casefold() in AMBIGUOUS_PROJECT_NAMES):
+            continue
+        projects.append((name, identifier, re.compile(r'(?<!\w)' + re.escape(name.casefold()) + r'(?!\w)')))
+    if not projects:
+        raise ValueError('landscape source contains no eligible unambiguous active project names')
+    result = copy.deepcopy(catalog)
+    digest = hashlib.sha256(body).hexdigest()
+    prior = result.get('source', {}).get('landscape', {})
+    observed_at = (retrieved_at or (prior.get('retrieved_at') if prior.get('raw_sha256') == digest else None)
+                   or dt.datetime.now(dt.timezone.utc).isoformat().replace('+00:00', 'Z'))
+    if not isinstance(observed_at, str) or not observed_at.endswith('Z'):
+        raise ValueError('landscape retrieval timestamp must use UTC Z')
+    dt.datetime.fromisoformat(observed_at)
+    added, matched_sessions = 0, 0
+    for talk in result['talks']:
+        # Remove only tags previously added by this enrichment; original schedule tags survive.
+        previous_added = {mention['name'] for mention in talk.get('derived_project_mentions', []) if mention.get('added_to_tags')}
+        tags = [tag for tag in talk.get('tags', []) if tag not in previous_added]
+        existing = {tag.casefold() for tag in tags}
+        title, abstract = talk['title'].casefold(), talk['abstract'].casefold()
+        matches = []
+        for name, identifier, pattern in projects:
+            title_match, abstract_match = pattern.search(title), pattern.search(abstract)
+            if title_match or abstract_match:
+                position = (0, title_match.start()) if title_match else (1, abstract_match.start())
+                matches.append((position, name.casefold(), name, identifier, title_match is not None, abstract_match is not None))
+        mentions = []
+        for _, _, name, identifier, in_title, in_abstract in sorted(matches)[:MAX_DERIVED_PROJECTS]:
+            is_new = name.casefold() not in existing
+            if is_new:
+                tags.append(name)
+                existing.add(name.casefold())
+                added += 1
+            mentions.append(dict(name=name, project_id=identifier, source_url='https://landscape.cncf.io/api/projects/' + identifier + '.json',
+                                 method='derived_exact_whole_name_mention', matched_fields=[field for field, found in [('title', in_title), ('abstract', in_abstract)] if found],
+                                 added_to_tags=is_new))
+        talk['tags'], talk['derived_project_mentions'] = tags, mentions
+        matched_sessions += bool(mentions)
+    result['source']['landscape'] = dict(status='enriched', url=LANDSCAPE, schema_url=LANDSCAPE_SCHEMA, raw_sha256=digest,
+                                       retrieved_at=observed_at, source_updated_at=None, source_project_records=len(rows),
+                                       eligible_project_names=len(projects), matched_sessions=matched_sessions, added_tags=added,
+                                       method='derived_exact_whole_name_mention', maximum_mentions_per_talk=MAX_DERIVED_PROJECTS,
+                                       matching_policy='Case-insensitive exact whole official name in title/abstract; title matches first. Active open-source projects only. Names shorter than 5 characters and explicit ambiguous ordinary-word names skipped. No aliases, fuzzy matches, vendor/category inference, affiliation or human relevance labels.',
+                                       excluded_ambiguous_names=sorted(AMBIGUOUS_PROJECT_NAMES))
+    validate(result)
+    return result
+
+
+def fetch_public(url, bound):
+    request = urllib.request.Request(url, headers={'User-Agent': 'Overflow public catalog ingest/1.0'})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        body = response.read(bound + 1)
+    if len(body) > bound:
+        raise ValueError('public source exceeds response size bound')
+    return body
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--input', type=Path, help='Offline Sessionize JSON fixture; raw input is never copied into repo')
     parser.add_argument('--validate', type=Path, help='Validate an existing normalized catalog and exit')
+    parser.add_argument('--enrich-catalog', type=Path, help='Enrich an existing catalog without refreshing schedule records')
+    parser.add_argument('--landscape-input', type=Path, help='Offline official projects/all.json snapshot; raw data is never copied')
+    parser.add_argument('--landscape-retrieved-at', help='Recorded UTC Z retrieval time for byte-reproducible offline replay')
+    parser.add_argument('--schedule-retrieved-at', help='Recorded UTC Z retrieval time when replaying offline schedule input')
+    parser.add_argument('--skip-landscape', action='store_true', help='Explicitly omit derived project enrichment')
     parser.add_argument('--output', type=Path, default=Path('app/data/catalog.json'))
     parser.add_argument('--capacity-estimate', type=int, default=200)
     args = parser.parse_args()
     if args.validate:
         print(json.dumps({'valid_talks': validate(json.loads(args.validate.read_text()))}))
         return
-    if args.input:
-        body = args.input.read_bytes()
+    if args.enrich_catalog:
+        if args.input:
+            parser.error('--enrich-catalog and --input cannot be combined')
+        result = json.loads(args.enrich_catalog.read_text())
+        validate(result)
     else:
-        request = urllib.request.Request(API, headers={'User-Agent': 'Overflow schedule ingest/1.0'})
-        with urllib.request.urlopen(request, timeout=30) as response:
-            body = response.read(10_000_001)
-        if len(body) > 10_000_000:
-            raise ValueError('schedule exceeds 10 MB bound')
-    result = normalize(json.loads(body), args.capacity_estimate, raw_sha256=hashlib.sha256(body).hexdigest())
+        body = args.input.read_bytes() if args.input else fetch_public(API, 10_000_000)
+        result = normalize(json.loads(body), args.capacity_estimate, retrieved_at=args.schedule_retrieved_at,
+                           raw_sha256=hashlib.sha256(body).hexdigest())
+    if args.landscape_input:
+        result = enrich_landscape(result, args.landscape_input.read_bytes(), args.landscape_retrieved_at)
+    elif not args.skip_landscape and (not args.input or args.enrich_catalog):
+        try:
+            result = enrich_landscape(result, fetch_public(LANDSCAPE, 5_000_000), args.landscape_retrieved_at)
+        except (urllib.error.URLError, TimeoutError, OSError):
+            if args.enrich_catalog:
+                raise ValueError('landscape unavailable; existing catalog was not replaced') from None
+            result['source']['landscape'] = dict(status='unavailable', url=LANDSCAPE, reason='Public source could not be fetched; no derived project tags were added.')
+    elif not args.enrich_catalog:
+        result['source']['landscape'] = dict(status='not_requested', url=LANDSCAPE, reason='Explicitly skipped or offline schedule supplied without landscape input; no derived project tags were added.')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary = args.output.with_suffix('.tmp')
     temporary.write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')

@@ -24,6 +24,7 @@
   </header>
 
   <main id="main" tabindex="-1">
+    <section id="room-watch-controls" class="room-watch-controls" aria-label="Room alerts" hidden><p data-watch-status></p><button class="button button-secondary" type="button" data-action="toggle-alerts">Pause alerts in this tab</button><div data-room-alert-list hidden></div></section>
     <section class="hero" id="discover-hero" aria-labelledby="hero-title">
       <div class="hero-copy">
         <p class="event-name">KubeCon + CloudNativeCon North America 2026</p>
@@ -83,7 +84,7 @@
   </main>
 
   <footer class="site-footer"><a class="footer-brand" href="#discover">overflow.</a><p>A plan, with room for possibility.</p><span class="service-health" id="service-health" role="status">Service health: checking</span><a href="https://events.linuxfoundation.org/kubecon-cloudnativecon-north-america/program/schedule/" target="_blank" rel="noopener noreferrer">Official conference schedule <span aria-hidden="true">↗</span></a></footer>
-  <dialog id="talk-dialog" class="talk-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+  <dialog id="talk-dialog" class="talk-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div><section id="modal-room-alerts" class="modal-room-alerts" aria-label="Room alerts" hidden><h3>Room alerts</h3><p data-watch-status></p><button class="button button-secondary" type="button" data-action="toggle-alerts">Pause alerts in this tab</button><div data-room-alert-list hidden></div><p class="dialog-footnote">Pause stops notifications in this tab. Your saved room watches remain. Reloading stops checks until you choose Watch room again.</p></section><p id="dialog-room-alert-status" class="sr-only" role="status" aria-live="polite"></p></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </body>
 </html>

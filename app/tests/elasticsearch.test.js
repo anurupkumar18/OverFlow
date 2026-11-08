@@ -79,7 +79,7 @@ for (const [name,crowd] of badCrowdResponses) {
    const path=new URL(url).pathname;
    if(path==='/overflow_settings/_doc/search')return Response.json({_source:{mode:'bm25'}});
    if(path==='/interactions/_search')return Response.json(crowd);
-   return Response.json({timed_out:false,_shards:{failed:0},hits:{total:{value:1},hits:[{_source:talk}]}});
+   return Response.json({timed_out:false,_shards:{total:1,successful:1,failed:0},hits:{total:{value:1,relation:'eq'},hits:[{_source:{...talk,id:'alternative',room:'Salt Palace | Level 2 | B'}}]}});
   }});
   const search=await es.searchTalks({q:'Kubernetes',available:true},[talk]);
   assert.equal(search.items[0].fullness.bookmarks,null);assert.equal(search.items[0].fullness.reports,null);
@@ -118,4 +118,81 @@ test('per-query lower mode ceiling pins ordering and cannot override runtime rol
  f.setMode('bm25');f.es.settingsAt=-Infinity;
  assert.equal((await f.es.searchTalks({q:'cloud',mode:'hybrid_rerank'},[talk])).mode,'bm25');
  assert.equal(f.es.requestedMode,'bm25');
+});
+
+const alternative = (id, extra={}) => ({...talk,id,room:'Salt Palace | Level 2 | '+id,...extra});
+function planFixture({mode='hybrid_rerank',failModes=[],candidateOverride,rankOverride,crowdOverride,semanticHighlightFails=false,clock=()=>Date.parse('2026-11-08T00:00:00Z')}={}) {
+ const candidates=[alternative('rank-first'),alternative('rank-second'),alternative('full')];
+ const envelope=(items,total=items.length)=>({timed_out:false,_shards:{total:1,successful:1,failed:0},hits:{total:{value:total,relation:'eq'},hits:items.map(item=>({_id:item.id,_source:item,highlight:{abstract:['A related Kubernetes excerpt']}}))}});
+ const calls=[];let setting=mode;
+ const es=new Elasticsearch({env:{ES_URL:'https://elastic.test',ES_RERANK_INFERENCE_ID:'verified-test-endpoint'},clock,fetchImpl:async(url,options)=>{
+  const path=new URL(url).pathname;const body=options.body?JSON.parse(options.body):undefined;calls.push({path,body,signal:options.signal});
+  if(path==='/overflow_settings/_doc/search')return Response.json({_source:{mode:setting}});
+  if(path==='/interactions/_search')return Response.json(crowdOverride||completeCrowd([{key:'full',doc_count:200,bookmarks:{doc_count:200},reports:{doc_count:0}}]));
+  if(path==='/talks/_search'){
+   if(body.size===1000)return Response.json(candidateOverride||envelope(candidates));
+   const actual=body.retriever?.text_similarity_reranker?'hybrid_rerank':body.retriever?.rrf?'hybrid':'bm25';
+   if(failModes.includes(actual)||(semanticHighlightFails&&body.highlight?.fields?.semantic_text))return Response.json({error:'private provider response'},{status:400});
+   return Response.json(rankOverride||envelope(candidates.slice(0,2)));
+  }
+  throw Error('Unexpected request');
+ }});
+ return {es,calls,candidates,envelope,setMode:mode=>{setting=mode;}};
+}
+test('Plan B executes filtered more_like_this plus semantic RRF and bounded rerank with actual matched excerpt',async()=>{
+ const f=planFixture();const result=await f.es.planBCandidates(talk);
+ assert.equal(result.mode,'hybrid_rerank');assert.equal(result.degraded,false);assert.deepEqual(result.items.map(t=>t.id),['rank-first','rank-second']);assert.match(result.items[0].why_matched,/Kubernetes excerpt/);
+ const ranked=f.calls.find(c=>c.body?.retriever?.text_similarity_reranker).body;
+ const reranker=ranked.retriever.text_similarity_reranker;assert.equal(ranked.size,20);assert.equal(reranker.rank_window_size,20);assert.equal(reranker.inference_id,'verified-test-endpoint');assert.match(reranker.inference_text,/Kubernetes/);
+ const children=reranker.retriever.rrf.retrievers;
+ assert.deepEqual(children[0].standard.query.bool.must[0].more_like_this.fields,['title','abstract']);assert.equal(children[0].standard.query.bool.must[0].more_like_this.min_term_freq,1);
+ assert.equal(children[1].standard.query.bool.must[0].semantic.field,'semantic_text');
+ for(const child of children){const query=child.standard.query.bool;assert.equal(query.filter[0].range.start.gte,'2026-11-10T16:50:00.000Z');assert.equal(query.filter[0].range.start.lte,'2026-11-10T17:10:00.000Z');assert.deepEqual(query.must_not,[{term:{room:talk.room}},{term:{id:talk.id}},{terms:{id:['full']}}]);}
+});
+test('Plan B fallback reports only an executed lower mode and honors runtime rollback/cache',async()=>{
+ let now=Date.parse('2026-11-08T00:00:00Z');const f=planFixture({failModes:['hybrid_rerank'],clock:()=>now});
+ const result=await f.es.planBCandidates(talk);assert.equal(result.mode,'hybrid');assert.equal(result.degraded,true);assert.match(result.reason,/hybrid/);assert.doesNotMatch(result.reason,/private/);
+ const calls=f.calls.length;await f.es.planBCandidates(talk);assert.equal(f.calls.length,calls);
+ f.setMode('bm25');now+=10001;const rollback=await f.es.planBCandidates(talk);assert.equal(rollback.mode,'bm25');assert.equal(rollback.degraded,false);
+ const request=f.calls.filter(c=>c.path==='/talks/_search').at(-1).body;assert.ok(request.query.bool.must[0].more_like_this);assert.equal(request.retriever,undefined);
+});
+test('Plan B semantic highlighting failure keeps successful hybrid retrieval with lexical explanation',async()=>{
+ const f=planFixture({mode:'hybrid',semanticHighlightFails:true});const result=await f.es.planBCandidates(talk);
+ assert.equal(result.mode,'hybrid');assert.equal(result.degraded,false);assert.match(result.items[0].why_matched,/Kubernetes excerpt/);
+ const queries=f.calls.filter(c=>c.body?.retriever?.rrf);assert.equal(queries.length,2);assert.ok(queries[0].body.highlight.fields.semantic_text);assert.equal(queries[1].body.highlight.fields.semantic_text,undefined);assert.ok(queries[1].body.highlight.fields.abstract);
+});
+for(const [name,override] of [
+ ['partial candidate shards',{timed_out:false,_shards:{total:2,successful:1,failed:1},hits:{total:{value:0,relation:'eq'},hits:[]}}],
+ ['truncated candidate window',{timed_out:false,_shards:{total:1,successful:1,failed:0},hits:{total:{value:1,relation:'eq'},hits:[]}}],
+ ['inexact candidate total',{timed_out:false,_shards:{total:1,successful:1,failed:0},hits:{total:{value:0,relation:'gte'},hits:[]}}],
+])test('Plan B rejects '+name+' instead of silently ranking an incomplete safe set',async()=>{
+ const f=planFixture({candidateOverride:override});await assert.rejects(f.es.planBCandidates(talk),/unavailable/);
+});
+test('Plan B partial ranked hits fall through modes and reject if no complete ranking succeeds',async()=>{
+ const f=planFixture({rankOverride:{timed_out:true,_shards:{total:1,successful:1,failed:0},hits:{total:{value:0,relation:'eq'},hits:[]}}});
+ await assert.rejects(f.es.planBCandidates(talk),/unavailable/);
+ const rankings=f.calls.filter(c=>c.path==='/talks/_search'&&c.body.size!==1000);assert.ok(rankings.some(c=>c.body.retriever?.text_similarity_reranker));assert.ok(rankings.some(c=>c.body.retriever?.rrf));assert.ok(rankings.some(c=>c.body.query?.bool?.must?.[0]?.more_like_this));
+});
+
+test('Plan B aborts the reranker at its 300ms budget and returns executed hybrid fallback',async t=>{
+ const http=require('node:http');const calls=[];const item=alternative('safe');
+ const search={timed_out:false,_shards:{total:1,successful:1,failed:0},hits:{total:{value:1,relation:'eq'},hits:[{_source:item,highlight:{semantic_text:['Containers on Kubernetes']}}]}};
+ const server=http.createServer(async(req,res)=>{
+  const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=chunks.length?JSON.parse(Buffer.concat(chunks)):null;
+  if(req.url==='/overflow_settings/_doc/search'){res.end(JSON.stringify({_source:{mode:'hybrid_rerank'}}));return;}
+  if(req.url==='/interactions/_search'){res.end(JSON.stringify(completeCrowd([])));return;}
+  calls.push(body);
+  if(body.retriever?.text_similarity_reranker)return;
+  res.end(JSON.stringify(search));
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>{server.closeAllConnections();server.close();});
+ const es=new Elasticsearch({env:{ES_URL:'http://127.0.0.1:'+server.address().port,ES_RERANK_INFERENCE_ID:'local-fixture'},clock:()=>Date.parse('2026-11-08T00:00:00Z')});
+ const start=performance.now();const result=await es.planBCandidates(talk);const elapsed=performance.now()-start;
+ assert.equal(result.mode,'hybrid');assert.equal(result.degraded,true);assert.equal(result.items[0].id,'safe');assert.ok(elapsed>=250&&elapsed<1500,`Observed ${elapsed}ms`);assert.equal(calls.filter(body=>body.retriever?.text_similarity_reranker).length,1);assert.ok(calls.some(body=>body.retriever?.rrf));
+});
+
+test('Plan B rejects a ranked response missing rows below its requested window',async()=>{
+ const f=planFixture();const incomplete=f.envelope(f.candidates.slice(0,1),2);
+ const broken=planFixture({rankOverride:incomplete});
+ await assert.rejects(broken.es.planBCandidates(talk),/unavailable/);
 });

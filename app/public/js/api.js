@@ -23,6 +23,6 @@ export const api = {
   config() { return request('/api/config'); },
   status() { return request('/api/status'); },
   interaction(data) { return request('/api/interactions', { method: 'POST', body: JSON.stringify(data) }); },
-  subscribe(data) { return request('/api/subscriptions', { method: 'POST', body: JSON.stringify(data) }); },
-  alerts(attendeeId) { return request(`/api/alerts?${new URLSearchParams({ attendee_id: attendeeId })}`); },
+  subscribe(data, signal) { return request('/api/subscriptions', { method: 'POST', body: JSON.stringify(data), signal }); },
+  alerts(attendeeId, signal) { return request(`/api/alerts?${new URLSearchParams({ attendee_id: attendeeId })}`, {signal}); },
 };

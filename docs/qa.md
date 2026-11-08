@@ -4,9 +4,9 @@ This is agent-operated verification, not human acceptance or proof of a remote d
 
 ## Automated checks
 
-- Node 22.23.4: 47 backend/telemetry/status tests passed. They cover fallback modes, exact fullness thresholds, partial shard/aggregation/search failures, bounded input/output, auth, probes, venue-aware Plan B, pagination, secret boundaries and status-provider backoff.
-- Backend timezone matrix: 38 tests each under UTC, America/Denver and Asia/Tokyo (final implementer rerun; root also verified the complete final Node 22 suite).
-- Python: 27 tests passed, including UTC/DST conversion, room clashes, real inference discovery schemas, exact runtime/eval query parity, blind pooling, partial labels and comparable-baseline enforcement.
+- Node 22.23.4: 119 backend/telemetry/status tests passed at the delivery-completion checkpoint. They cover fallback modes, exact fullness thresholds, partial shard/aggregation/search failures, bounded input/output, auth, probes, venue-aware Plan B, pagination, secret boundaries and status-provider backoff.
+- Backend timezone matrix: 109 app tests each under UTC, America/Denver and Asia/Tokyo (root rerun on the delivery-completion changes).
+- Python: 50 tests passed at the delivery-completion checkpoint, including UTC/DST conversion, room clashes, real inference discovery schemas, exact runtime/eval query parity, blind pooling, partial labels and comparable-baseline enforcement.
 - UI state checks: 11 passed, including query pagination races, fallback ordering changes, stale saved signals, per-response degradation, cross-tab saves, dialog return focus, service health and acknowledged crowd interest writes.
 - Actual OTLP collector smoke on Node 22 received `/v1/traces`, `/v1/metrics`, and `/v1/logs`. This verifies local export only.
 - Catalog validation: 470 unique scheduled entries, ordered UTC intervals, no selected same-room overlap. Capacities remain uniform estimates.
@@ -30,6 +30,20 @@ Five live-action UI checks passed with explicitly simulated API responses: visib
 
 Six additional browser assertions verified hybrid-to-snapshot and rerank-to-hybrid pagination transitions: each restarts at offset zero, subsequent pages keep the selected ordering even if the provider recovers, and a new query clears the mode pin. These use real catalog records with explicitly simulated mode changes.
 
+## Delivery completion checks
+
+The actual Dash0 browser SDK was exercised in Chromium against a localhost collector on Node22. The collector received Web Vitals, generic errors, safe events and an independent anonymous identity; the browser fetch span matched its backend trace and parent ID. A combined-payload check verified synthetic page/search/error/read-token markers were absent from browser, server and outbound spans. This test caught and fixed a stable OTel URL-query leak. No remote Dash0 ingestion is inferred.
+
+The main15 Playwright flows were rerun after the hybrid Plan B/RUM/contract integration, with three actual snapshot alternatives, zero checked axe violations and no narrow-screen overflow. Contract tests exercise all browser wrappers against the real local HTTP app and compare them with the runtime route inventory and declared caller roles. They are route coverage, not a complete formal validation of every response schema.
+
+The final room-watch/Plan B browser fixture passed17 scenarios. It exercises acknowledged registration,15-second visible-page checks, bounded failure backoff, pause/resume, pending-write races, persistent named actions inside/outside native dialogs, current fullness propagation and stale/cleared observations becoming unknown. Fixture screenshots deliberately simulate crowd API responses; they are not evidence of physical occupancy or deployed provider traffic.
+
+Fresh evaluation intentionally exits not_evaluated (n=0) without approved human evidence. Regression tests prove fresh provider failures can reject an old baseline, source/index mismatch cannot pass, and observed provider drift remains unavailable. Provider fixtures in these tests are not measured ranking results.
+
+## Real local Elasticsearch
+
+An isolated Elasticsearch9.5.6 basic-license runtime indexed the same470-record catalog. All12 final API scenarios passed, plus capacity-boundary and nonvacuous full-room-exclusion checks. Actual ES|QL, strict aggregation parity, BM25, MLT Plan B, writes/alerts, mode persistence and fallback were exercised. Semantic mapping/inference was disabled. See [the bounded report](local-elasticsearch-qa.md). A critical host memory-pressure guard ended the run before browser-on-real-Elasticsearch verification; owned services stopped and ports were checked clear.
+
 ## Independent review
 
 Separate reviewers examined data/evaluation, backend, and UI. They found and re-reviewed fixes for incomparable eval baselines, ranking-query mismatch, partial crowd results represented as live zero, unbounded metrics responses, pagination races, stale persisted signals, missing mode disclosure, cross-tab controls, and dialog focus return.
@@ -39,6 +53,6 @@ A fresh whole-branch review then found incomplete alert searches, fallback pagin
 ## Limits
 
 - No verified remote Elasticsearch, inference endpoint, Dash0 account ingestion, Radar cluster, Gitar PR review or public deployment.
-- Browser RUM, percolator alerts, ES|QL crowd aggregation, hosted investigations, dashboards and SLOs are not claimed. Alerts currently use explicit polling/check actions and Elasticsearch aggregations.
+- Remote browser RUM, percolator alerts, hosted investigations, applied dashboards and SLOs are not claimed. Alerts use acknowledged subscriptions and visible-page polling. ES|QL counts have a strictly checked aggregation compatibility fallback; production crowd data is unverified.
 - Docker CLI is absent on this machine, so local container build was not run. A container build job is included in CI but has not run remotely.
-- No human relevance labels, production latency benchmark, phone hardware test, screen-reader user study, recorded video, or submission exists from this session.
+- No browser run against real Elasticsearch, human relevance labels, production latency benchmark, phone hardware test, screen-reader user study, recorded video, or submission exists from this session.

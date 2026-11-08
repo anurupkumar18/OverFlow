@@ -1,0 +1,198 @@
+{
+  "runtime": {
+    "elasticsearch": "9.5.6",
+    "license": "basic",
+    "heap_mib": 512,
+    "http": "127.0.0.1:19200",
+    "app": "127.0.0.1:18080",
+    "stopped": true
+  },
+  "catalog_talk_count": 470,
+  "catalog_snapshot_sha256": "0d33ec7d66ed8939033c46283c89f2e9eb780f8cb19886b75f62a440deb178c9",
+  "integration": {
+    "at": "2026-11-08T22:52:42.947Z",
+    "source_id": "1227395",
+    "target_id": "1378907",
+    "tests": [
+      {
+        "name": "database version and basic license",
+        "passed": true,
+        "ms": 29,
+        "detail": {
+          "version": "9.5.6",
+          "license": "basic"
+        }
+      },
+      {
+        "name": "config and protected dependencies use real ES",
+        "passed": true,
+        "ms": 33,
+        "detail": {
+          "live_interactions": true
+        }
+      },
+      {
+        "name": "BM25 searches real indexed public catalog",
+        "passed": true,
+        "ms": 87,
+        "detail": {
+          "total": 284,
+          "mode": "bm25"
+        }
+      },
+      {
+        "name": "chronological browse pagination is complete and disjoint",
+        "passed": true,
+        "ms": 58,
+        "detail": {
+          "total": 470,
+          "first": 100,
+          "next": 100
+        }
+      },
+      {
+        "name": "real MLT Plan B has three valid alternatives",
+        "passed": true,
+        "ms": 67,
+        "detail": {
+          "source_id": "1227395",
+          "alternative_ids": [
+            "1378907",
+            "1246200",
+            "1202489"
+          ],
+          "mode": "bm25"
+        }
+      },
+      {
+        "name": "bookmark idempotence and ES|QL actual execution",
+        "passed": true,
+        "ms": 1513,
+        "detail": {
+          "method": "esql",
+          "bookmarks": 1
+        }
+      },
+      {
+        "name": "full reports are idempotent; second attendee makes room full",
+        "passed": true,
+        "ms": 3077,
+        "detail": {
+          "bookmarks": 1,
+          "reports": 2,
+          "capacity": 200,
+          "capacity_source": "estimate",
+          "pressure": 0.005,
+          "likely_full": true,
+          "signal": "live"
+        }
+      },
+      {
+        "name": "smoke IDs and old/future reports excluded by both real query types",
+        "passed": true,
+        "ms": 2065,
+        "detail": {
+          "method": "esql",
+          "bookmarks": 1,
+          "reports": 2,
+          "aggregation_equal": true
+        }
+      },
+      {
+        "name": "known full room excluded from real Plan B and available search",
+        "passed": true,
+        "ms": 89,
+        "detail": {
+          "full_id": "1378907",
+          "plan_b_count": 3,
+          "available_total": 469
+        }
+      },
+      {
+        "name": "live subscription yields actionable real full-room alert",
+        "passed": true,
+        "ms": 905,
+        "detail": {
+          "alerts": 1
+        }
+      },
+      {
+        "name": "unbookmark is repeatable and exact count returns zero",
+        "passed": true,
+        "ms": 2020,
+        "detail": {
+          "bookmarks": 0,
+          "reports": 2
+        }
+      },
+      {
+        "name": "admin mode persists then honest semantic-unavailable BM25 fallback",
+        "passed": true,
+        "ms": 83,
+        "detail": {
+          "stored": "hybrid_rerank",
+          "executed": "bm25",
+          "degraded": true
+        }
+      }
+    ]
+  },
+  "capacity_boundary": {
+    "passed": true,
+    "talk_id": "1289969",
+    "states": [
+      {
+        "bookmarks": 199,
+        "reports": 0,
+        "capacity": 200,
+        "capacity_source": "estimate",
+        "pressure": 0.995,
+        "likely_full": false,
+        "signal": "live"
+      },
+      {
+        "bookmarks": 200,
+        "reports": 0,
+        "capacity": 200,
+        "capacity_source": "estimate",
+        "pressure": 1,
+        "likely_full": true,
+        "signal": "live"
+      },
+      {
+        "bookmarks": 199,
+        "reports": 0,
+        "capacity": 200,
+        "capacity_source": "estimate",
+        "pressure": 0.995,
+        "likely_full": false,
+        "signal": "live"
+      }
+    ]
+  },
+  "strict_nonvacuous_exclusion": {
+    "passed": true,
+    "source_id": "1249749",
+    "excluded_id": "1246200",
+    "initial_count": 1,
+    "after_count": 0,
+    "fullness": {
+      "bookmarks": 0,
+      "reports": 2,
+      "capacity": 200,
+      "capacity_source": "estimate",
+      "pressure": 0,
+      "likely_full": true,
+      "signal": "live"
+    }
+  },
+  "not_run": [
+    "inference/rerank",
+    "post-fix twelve-source coverage sampler",
+    "browser against real Elasticsearch"
+  ],
+  "termination_reason": "system memory-pressure guard; owned services stopped and listeners clear",
+  "checked_in_catalog_sha256": "dcca48f7ac1e695151acce8a551b336ce22301752719025b0e73a5b0ec055c2f",
+  "catalog_json_semantically_equal": true,
+  "catalog_hash_note": "Raw bytes differ only in JSON serialization; parsed sources and all470 records are identical."
+}

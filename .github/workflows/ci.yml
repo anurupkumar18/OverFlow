@@ -5,6 +5,27 @@ on:
 permissions:
   contents: read
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ranking: ${{ steps.paths.outputs.ranking }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - id: paths
+        name: Detect ranking changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          python3 - <<'PY'
+          import os, subprocess
+          base = os.environ.get('BASE_SHA')
+          files = subprocess.check_output(['git', 'diff', '--name-only', base, 'HEAD'], text=True).splitlines() if base else []
+          required = not base or any(path.startswith(('app/src/', 'app/data/', 'scripts/ingest/', 'eval/')) for path in files)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('ranking=' + str(required).lower() + '\n')
+          PY
   app:
     runs-on: ubuntu-latest
     strategy:
@@ -21,6 +42,7 @@ jobs:
           cache: npm
           cache-dependency-path: app/package-lock.json
       - run: npm ci --prefix app
+      - run: npm run build:browser --prefix app
       - run: npm --prefix app test
       - run: node --test scripts/telemetry.test.cjs scripts/status-provider.test.cjs
       - run: node scripts/ui-state-check.cjs
@@ -34,8 +56,47 @@ jobs:
           python-version: '3.12'
       - run: python -m unittest discover -s scripts/tests -v
       - run: python scripts/ingest/catalog.py --validate app/data/catalog.json
-      - name: Report ranking evaluation evidence
+      - name: Report saved ranking evidence (informational only)
         run: python eval/gate.py
+  ranking-evaluation:
+    name: Fresh ranking evidence
+    needs: changes
+    if: needs.changes.outputs.ranking == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Collect fresh rankings and enforce the approved baseline
+        env:
+          ES_URL: ${{ secrets.ES_URL }}
+          ES_READ_KEY: ${{ secrets.ES_READ_KEY }}
+          ES_RERANK_INFERENCE_ID: ${{ vars.ES_RERANK_INFERENCE_ID }}
+        run: python eval/ci.py --output /tmp/overflow-ranking
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ranking-evidence
+          path: /tmp/overflow-ranking
+          if-no-files-found: ignore
+  browser-telemetry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci --prefix app
+      - run: npm run build:browser --prefix app
+      - run: npx --prefix app playwright install --with-deps chromium
+      - run: node scripts/browser-otlp-smoke.cjs
+      - run: node scripts/browser-alerts-smoke.cjs
+      - run: node scripts/browser-alerts-regressions.cjs
   container:
     runs-on: ubuntu-latest
     steps:

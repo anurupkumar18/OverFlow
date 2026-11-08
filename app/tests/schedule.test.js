@@ -59,3 +59,12 @@ test('Talk output does not leak embedding fields or provider metadata',()=>{
 test('every fullness response retains its denominator and unknown signal even with partial input',()=>{
  const result=normalizeTalk(talk('a',{fullness:{likely_full:true,secret:'private'}}));assert.equal(result.fullness.capacity,200);assert.equal(result.fullness.capacity_source,'estimate');assert.equal(result.fullness.signal,'unavailable');assert.equal(result.fullness.secret,undefined);
 });
+
+test('live Plan B preserves provider relevance within same-venue floor priority',()=>{
+ const source=talk('source',{tags:['Security'],track:'Security'});
+ const ranked=[talk('best-other-floor',{floor:'Level 1',tags:['Security'],track:'Security'}),talk('provider-best',{tags:['Storage'],track:'Storage',why_matched:'Kubernetes admission policies'}),talk('provider-second',{tags:['Security'],track:'Security'})];
+ const result=planB(source,ranked,new Date('2026-11-08T00:00:00Z'),{ranked:true});
+ assert.deepEqual(result.map(t=>t.id),['provider-best','provider-second','best-other-floor']);
+ assert.match(result[0].why_matched,/Kubernetes admission policies/);
+ assert.match(result[0].why_matched,/Same floor/);
+});

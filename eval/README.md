@@ -29,6 +29,14 @@ Metrics use only queries whose entire pool has human judgments, at least one jud
 
 `gate.py` recomputes metrics from runs and labels. Without genuine nonempty human-labeled results or a participant-approved measured baseline it prints `status:not_evaluated`, never `passed`. Its default exit 0 makes this an informational CI report; `--require-evaluated` exits 2 when evidence is absent. A measured MRR drop greater than 0.05 exits 1. No `baseline.json` exists initially. A future approved baseline must record `arm`, measured `mrr`, positive `n`, `label_source:human`, `approved:true`, and copy `eligible_query_ids` plus the complete `evidence` object from its reviewed measured result. Exact eligible cohort/n, query wording, human labels, actual indexed corpus and ranking-configuration fingerprints must match the current result; missing or changed identities report **not_evaluated**, never a regression pass across incomparable cohorts.
 
+The separate **Fresh ranking evidence** CI job is required for changes under `app/src/`, `app/data/`, `scripts/ingest/` or `eval/`, and on manual workflow runs. `eval/ci.py` collects new provider runs using the configured read-only connection, never reuses `runs.json` as current evidence, and requires its remote corpus fingerprint to match the checked-out catalog before evaluating. It refuses old-index/new-catalog comparisons and performs no index writes. A changed catalog must first be loaded into an approved evaluation environment. No provider secrets, baseline or labels means `not_evaluated` with a nonzero exit; this build intentionally does not claim that gate passes. Forks without secrets have the same explicit evidence gap. GitHub branch-protection settings still need to require the job in the owned repository.
+
+```sh
+python3 eval/ci.py --env /absolute/private/overflow.env --output /tmp/overflow-ranking
+```
+
+The output directory holds fresh run/report/gate artifacts, separate from committed human judgments. The script does not relabel or overwrite the human pool. Changed query pools or configurations need deliberate new human review, not a silently replaced baseline.
+
 For real collections, the collector fingerprints up to1000 actual indexed documents (excluding derived semantic_text), mappings, index settings, synonym-set contents, existing inference configuration and request bodies both before and after collection. Only equal complete before/after evidence is recorded. Missing metadata access, a larger corpus, or observed drift leaves evidence absent and the regression gate not evaluated. Extra read privileges include index metadata and the synonym-set read API; do not expand a key silently. Hashes alone are not proof of real execution; preserve original provider-run evidence and human approval. Real provider access and cloud writes remain **unverified** in this build.
 
 ## Elasticsearch ingestion

@@ -1,9 +1,13 @@
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY app/package.json app/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY app/ ./
+RUN npm run build:browser && npm prune --omit=dev --no-audit --no-fund
+
 FROM node:22-alpine
 WORKDIR /app
-COPY app/ .
-# Install the app's dependencies, if it has any (the starter has none).
-RUN if [ -f package-lock.json ]; then npm ci --omit=dev --no-audit --no-fund; \
-    elif [ -f package.json ]; then npm install --omit=dev --no-audit --no-fund; fi
+COPY --from=build --chown=1000:1000 /app ./
 ARG APP_VERSION=dev
 ENV PORT=8080 APP_VERSION=$APP_VERSION NODE_ENV=production
 # The node image's "node" user, by number so runAsNonRoot can check it.

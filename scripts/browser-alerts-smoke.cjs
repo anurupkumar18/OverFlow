@@ -1,0 +1,64 @@
+// Playwright fixtures verify UI/controller behavior, not a live Elasticsearch account.
+const http=require('node:http');
+const fs=require('node:fs');
+const path=require('node:path');
+const assert=require('node:assert/strict');
+const {chromium}=require('../app/node_modules/playwright');
+const {createApp}=require('../app/src/app');
+const catalog=JSON.parse(fs.readFileSync(path.join(__dirname,'../app/data/catalog.json'),'utf8'));
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function until(check,message){for(let i=0;i<60;i++){if(await check())return;await delay(50);}throw Error(message);}
+let browser;const server=http.createServer(createApp({catalog,env:{APP_VERSION:'alerts-fixture'}}));
+(async()=>{
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base='http://127.0.0.1:'+server.address().port;
+  browser=await chromium.launch({headless:true,...(process.env.BROWSER_CHANNEL?{channel:process.env.BROWSER_CHANNEL}:{})});
+  const page=await browser.newPage({viewport:{width:390,height:844}});const pageErrors=[];page.on('pageerror',e=>pageErrors.push(e.message));
+  await page.clock.install();
+  let polls=0,subscriptions=0,failSubscribe=true,fail=false,items=[];const talk=catalog.talks[0];
+  await page.route('**/api/config',async route=>{const response=await route.fetch();await route.fulfill({json:{...await response.json(),live_interactions:true}});});
+  await page.route('**/api/talks/'+talk.id,route=>route.fulfill({json:{item:{...talk,fullness:{signal:'live',bookmarks:0,reports:0,pressure:0,likely_full:false,capacity:200,capacity_source:'estimate'}},mode:'bm25',degraded:false,source:catalog.source}}));
+  await page.route('**/api/subscriptions',route=>{subscriptions++;return route.fulfill({status:failSubscribe?503:200,json:failSubscribe?{error:'Fixture watch unavailable'}:{ok:true}});});
+  await page.route('**/api/alerts?*',route=>{polls++;return route.fulfill({status:fail?503:200,json:fail?{error:'Fixture alerts unavailable'}:{items}});});
+  await page.goto(base);await page.locator('#talk-results article').first().waitFor();
+  await page.clock.runFor(60000);assert.equal(polls,0);
+  await page.locator('#talk-results article h3 button').first().click();const dialog=page.locator('#talk-dialog');
+  await dialog.getByRole('button',{name:'Watch room',exact:true}).click();
+  await until(async()=>(await dialog.locator('#live-feedback').innerText()).includes('Fixture watch unavailable'),'Failed watch did not explain failure');assert.equal(polls,0);
+  failSubscribe=false;await dialog.getByRole('button',{name:'Watch room',exact:true}).click();
+  await until(()=>polls===1,'Explicit watch did not check alerts');
+  await until(async()=>(await dialog.locator('[data-watch-status]').innerText()).includes('every 15 seconds'),'Watch interval not disclosed');
+  await page.evaluate(()=>{window.alertToastMessages=[];new MutationObserver(()=>window.alertToastMessages.push(document.querySelector('#toast').textContent)).observe(document.querySelector('#toast'),{childList:true,characterData:true,subtree:true});});
+  items=[{talk_id:talk.id,type:'likely_full',message:'Fixture room likely full',item:{...talk,fullness:{signal:'live',bookmarks:0,reports:2,pressure:0,likely_full:true,capacity:200,capacity_source:'estimate'}}}];
+  await page.clock.runFor(15000);await until(()=>polls===2,'Next poll did not run after15 seconds');
+  await until(async()=>(await page.locator('#toast').innerText()).includes('Fixture room likely full'),'New room alert not announced');
+  await page.clock.runFor(15000);await until(()=>polls===3,'Repeat poll missing');
+  assert.equal(await page.evaluate(()=>window.alertToastMessages.filter(message=>message.includes('Fixture room likely full')).length),1);
+  fail=true;await page.clock.runFor(15000);await until(async()=>(await dialog.locator('[data-watch-status]').innerText()).includes('unavailable'),'Error was not distinguished from all-clear');
+  const failedPolls=polls;await page.clock.runFor(15000);assert.equal(polls,failedPolls);await page.clock.runFor(15000);await until(()=>polls===failedPolls+1,'30-second retry missing');
+  fail=false;await page.clock.runFor(60000);await until(async()=>(await dialog.locator('[data-watch-status]').innerText()).includes('Watching 1 room'),'Recovery did not resume ordinary watches');
+  await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'hidden'});document.dispatchEvent(new Event('visibilitychange'));});
+  const hiddenPolls=polls;await page.clock.runFor(60000);assert.equal(polls,hiddenPolls);
+  await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,value:'visible'});document.dispatchEvent(new Event('visibilitychange'));});
+  await until(()=>polls===hiddenPolls+1,'Visible tab did not resume');
+  await dialog.getByRole('button',{name:'Pause alerts in this tab',exact:true}).click();
+  const pausedPolls=polls;await page.clock.runFor(120000);assert.equal(polls,pausedPolls);
+  assert.match(await dialog.locator('[data-watch-status]').innerText(),/saved room watches remain/);
+  await dialog.getByRole('button',{name:'Resume room alerts',exact:true}).click();await until(()=>polls===pausedPolls+1,'Local resume missing');assert.equal(subscriptions,2);
+  await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));const hiddenPagePolls=polls;await page.clock.runFor(90000);assert.equal(polls,hiddenPagePolls);
+  await page.evaluate(()=>window.dispatchEvent(new Event('pageshow')));await until(()=>polls===hiddenPagePolls+1,'Restored page did not resume');
+  await page.keyboard.press('Escape');assert.equal(await page.locator('#room-watch-controls').isVisible(),true);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  if(process.env.ALERTS_SCREENSHOT_DIR){
+    fs.mkdirSync(process.env.ALERTS_SCREENSHOT_DIR,{recursive:true});
+    await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>window.scrollTo(0,0));
+    await page.screenshot({path:path.join(process.env.ALERTS_SCREENSHOT_DIR,'overflow-alerts-desktop.png')});
+    await page.setViewportSize({width:390,height:844});await page.locator('#talk-results article h3 button').first().click();
+    await dialog.getByRole('button',{name:'Room watched',exact:true}).waitFor();
+    await dialog.locator('#modal-room-alerts').scrollIntoViewIfNeeded();
+    await page.screenshot({path:path.join(process.env.ALERTS_SCREENSHOT_DIR,'overflow-alerts-mobile.png')});
+  }
+  await page.reload();await page.locator('#talk-results article').first().waitFor();const reloadedPolls=polls;await page.clock.runFor(30000);assert.equal(polls,reloadedPolls);assert.equal(await page.locator('#room-watch-controls').isVisible(),false);
+  await page.unrouteAll({behavior:'wait'});await page.reload();await page.locator('#talk-results article').first().waitFor();
+  assert.equal((await page.request.get(base+'/api/config').then(response=>response.json())).live_interactions,false);
+  assert.deepEqual(pageErrors,[]);
+  console.log(JSON.stringify({fixture:'simulated live APIs over real catalog',checks:['no unsolicited polling','subscription failure does not start polling','explicit watch and15-second cadence','unchanged alerts not repeated','unavailable and bounded backoff','visibility pause/resume','local pause/resume preserves server subscription','pagehide/pageshow','mobile control has no overflow','reload does not restart without explicit watch','no page errors'],remote_verified:false}));
+})().catch(error=>{console.error(error.message);process.exitCode=1;}).finally(async()=>{await browser?.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));});

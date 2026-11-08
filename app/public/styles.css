@@ -1194,6 +1194,34 @@ body:has(dialog[open]) {
   color:var(--sea);
   line-height:1.7
 }
+.room-watch-controls {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:12px;
+  padding:14px 18px;
+  margin:16px 0;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#eef0e9
+}
+.room-watch-controls p {
+  flex:1 1 230px;
+  margin:0;
+  font-size:13px;
+  line-height:1.6;
+  color:var(--ink)
+}
+.room-watch-controls [data-room-alert-list] { flex:1 1 100% }
+.modal-room-alerts { padding:22px 28px; border-top:1px solid var(--line); background:#eef0e9 }
+.modal-room-alerts > p { font-size:13px; line-height:1.6; margin:10px 0 }
+.room-alert-list { list-style:none; margin:16px 0 0; padding:0; display:grid; gap:12px }
+.room-alert-list li { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; border-top:1px solid var(--line); padding-top:12px }
+.room-alert-list li > div:first-child { flex:1 1 220px; min-width:0 }
+.room-alert-list strong { font-size:14px; line-height:1.5; overflow-wrap:anywhere }
+.room-alert-list p,.room-alert-stale { font-size:12px; line-height:1.6; margin:4px 0; color:var(--muted); overflow-wrap:anywhere }
+.room-alert-actions { display:flex; flex-wrap:wrap; gap:8px }
 .conflict-label {
   font-size:10px;
   color:#626b57;

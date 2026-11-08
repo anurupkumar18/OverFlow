@@ -11,6 +11,6 @@ const {createStatusProvider}=require('./status-provider.cjs');
 const statusProvider=createStatusProvider({env:process.env});
 const server=http.createServer(createApp({catalog,es,observer,statusProvider}));
 server.requestTimeout=10000;server.headersTimeout=12000;server.keepAliveTimeout=5000;
-server.listen(Number(process.env.PORT||8080),()=>console.log(JSON.stringify({event:'listening',port:Number(process.env.PORT||8080),version:process.env.APP_VERSION||'dev'})));
+server.listen(Number(process.env.PORT||8080),()=>console.log(JSON.stringify({event:'listening',port:server.address().port,version:process.env.APP_VERSION||'dev'})));
 function shutdown(){server.close(async()=>{try{await shutdownTelemetry();}finally{process.exit(0);}});setTimeout(()=>process.exit(0),10000).unref();}
 process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);

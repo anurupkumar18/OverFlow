@@ -1,0 +1,120 @@
+# Prepared only: not applied or verified in a Dash0 account.
+apiVersion: perses.dev/v1alpha1
+kind: PersesDashboard
+metadata:
+  name: overflow-service-overview
+spec:
+  duration: 1h
+  display:
+    name: Overflow service overview
+    description: Prepared configuration; verify actual metric names and units in the
+      target account. Missing data is not a healthy zero.
+  layouts:
+  - kind: Grid
+    spec:
+      items:
+      - x: 0
+        y: 0
+        width: 12
+        height: 8
+        content:
+          $ref: '#/spec/panels/request-rate'
+      - x: 12
+        y: 0
+        width: 12
+        height: 8
+        content:
+          $ref: '#/spec/panels/latency'
+      - x: 0
+        y: 8
+        width: 12
+        height: 8
+        content:
+          $ref: '#/spec/panels/error-ratio'
+      - x: 12
+        y: 8
+        width: 12
+        height: 8
+        content:
+          $ref: '#/spec/panels/degraded-share'
+  panels:
+    request-rate:
+      kind: Panel
+      spec:
+        display:
+          name: Search and Plan B requests per second
+        plugin:
+          kind: TimeSeriesChart
+          spec:
+            yAxis:
+              min: 0
+        queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                query: sum(rate(overflow_search_requests_total{service_name="overflow"}[5m]))
+                minStep: 1m
+    latency:
+      kind: Panel
+      spec:
+        display:
+          name: Search and Plan B p95
+        plugin:
+          kind: TimeSeriesChart
+          spec:
+            yAxis:
+              min: 0
+              format:
+                unit: milliseconds
+        queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                query: histogram_quantile(0.95, sum by (le) (rate(overflow_search_duration_milliseconds_bucket{service_name="overflow"}[5m])))
+                minStep: 1m
+    error-ratio:
+      kind: Panel
+      spec:
+        display:
+          name: Search and Plan B server error ratio
+        plugin:
+          kind: TimeSeriesChart
+          spec:
+            yAxis:
+              min: 0
+              max: 1
+        queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                query: (sum(rate(overflow_search_requests_total{service_name="overflow",http_response_status_code=~"5.."}[5m]))
+                  or on() vector(0)) / (sum(rate(overflow_search_requests_total{service_name="overflow"}[5m]))
+                  > 0)
+                minStep: 1m
+    degraded-share:
+      kind: Panel
+      spec:
+        display:
+          name: Degraded search and Plan B share
+        plugin:
+          kind: TimeSeriesChart
+          spec:
+            yAxis:
+              min: 0
+              max: 1
+        queries:
+        - kind: TimeSeriesQuery
+          spec:
+            plugin:
+              kind: PrometheusTimeSeriesQuery
+              spec:
+                query: sum(rate(overflow_search_degraded_total{service_name="overflow"}[5m]))
+                  / (sum(rate(overflow_search_requests_total{service_name="overflow"}[5m]))
+                  > 0)
+                minStep: 1m
