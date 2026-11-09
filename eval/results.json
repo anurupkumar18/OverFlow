@@ -1,6 +1,6 @@
 {
   "n": 0,
-  "total_queries": 0,
+  "total_queries": 20,
   "eligible_query_ids": [],
   "evidence": {
     "queries_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -9,7 +9,28 @@
     "ranking_config_sha256": null
   },
   "excluded_incomplete": [],
-  "excluded_failed": [],
+  "excluded_failed": [
+    "q01",
+    "q02",
+    "q03",
+    "q04",
+    "q05",
+    "q06",
+    "q07",
+    "q08",
+    "q09",
+    "q10",
+    "q11",
+    "q12",
+    "q13",
+    "q14",
+    "q15",
+    "q16",
+    "q17",
+    "q18",
+    "q19",
+    "q20"
+  ],
   "excluded_no_relevant": [],
   "arms": {
     "bm25": {
