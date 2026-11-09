@@ -54,5 +54,5 @@ A fresh whole-branch review then found incomplete alert searches, fallback pagin
 
 - No verified remote Elasticsearch, inference endpoint, Dash0 account ingestion, Radar cluster, Gitar PR review or public deployment.
 - Remote browser RUM, percolator alerts, hosted investigations, applied dashboards and SLOs are not claimed. Alerts use acknowledged subscriptions and visible-page polling. ES|QL counts have a strictly checked aggregation compatibility fallback; production crowd data is unverified.
-- Docker CLI is absent on this machine, so local container build was not run. A container build job is included in CI but has not run remotely.
+- Docker CLI is absent locally. Remote GitHub container build and publication now passed; the first remote CI also passed its container/data/timezone jobs but exposed a browser-telemetry teardown race now fixed in PR1, pending its Linux check. See [cloud delivery evidence](cloud-delivery.md). The workflow is not fully passing.
 - No completed live browser workflow against real Elasticsearch, human relevance labels, production latency benchmark, phone hardware test, screen-reader user study, recorded video, or submission exists from this session.
