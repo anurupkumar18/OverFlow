@@ -13,4 +13,4 @@ This is a build evidence register, not a claim to have satisfied all judging cri
 
 The build starts November 8, before the published official coding window. The repository must disclose this. Eligibility is not established by this implementation.
 
-See `completion-audit.md` for the requirement ledger and `local-elasticsearch-qa.md` for database evidence and its resource limit. Container execution, real inference, browser-on-real-Elasticsearch and account/human evidence remain outstanding.
+See `completion-audit.md` for the requirement ledger and `local-elasticsearch-qa.md` for database evidence and its resource limit. Remote container build/publication is verified in `cloud-delivery.md`; container runtime/cluster rollout, real inference, the complete live browser workflow and account/human evidence remain outstanding. PR1 fixes the first remote CI browser-telemetry failure, verified by Linux CI42559268416 on a2e637f. Its ranking evidence job was skipped; human evaluation remains unsatisfied.

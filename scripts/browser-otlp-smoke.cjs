@@ -44,10 +44,13 @@ const watchdog=setTimeout(()=>{child?.kill('SIGKILL');collector.closeAllConnecti
   await page.getByRole('button',{name:'Search',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#results-count').textContent.trim()==='0 sessions');
   await page.evaluate(()=>window.dispatchEvent(new ErrorEvent('error',{message:'secret-error-92741',error:new Error('secret-error-92741')})));
-  // Closing the page flushes Web Vitals such as LCP/CLS through the SDK's visibility handler.
-  await delay(1500);await page.close();
+  // Error aggregation and log batching each use a timer. Keep the context alive
+  // until the collector confirms delivery; an arbitrary close can discard both.
   await until(()=>records().some(r=>attribute(r.log.attributes,'event.name')==='overflow.ui.action'),'Browser custom event did not reach local collector');
   await until(()=>records().some(r=>attribute(r.log.attributes,'event.name')==='browser.error'),'Sanitized browser error did not reach local collector');
+  // A real document navigation triggers Web Vitals' visibility/pagehide handlers.
+  // page.close() tears down browser.newPage()'s owned context without that guarantee.
+  await page.goto(base+'/favicon.svg');
   await until(()=>records().some(r=>/web_vital/.test(attribute(r.log.attributes,'event.name')||'')),'Web Vital did not reach local collector');
   assert.match(traceparent||'',/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
   const [,traceId,parentId]=traceparent.split('-');
