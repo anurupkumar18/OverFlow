@@ -24,7 +24,7 @@ spec:
               containerPort: 8080
           env:
             - name: TEAM_NAME
-              value: "__TEAM__"
+              value: "overflow"
             - name: ES_URL
               valueFrom:
                 secretKeyRef: {name: app-credentials, key: es-url, optional: true}

@@ -15,8 +15,8 @@ The current user instruction authorizes autonomous work now and replaces the ref
 | Server observability and health | Actual local OTLP traces/logs/metrics; metric queries/cache/backoff; no fake status | Actual Dash0 ingestion/query, dashboard and provider investigation |
 | Browser RUM/correlation | Actual local SDK exports, Web Vitals/errors/actions, independent identity and matching backend parent span; combined redaction regression | Real restricted ingest token and Dash0 account verification |
 | Contract, reproducibility and build | Runtime registry vs OpenAPI/browser wrappers; Node/Python/UI tests; browser bundle built/pruned in clean copy | Docker execution and remote CI; Docker unavailable on host |
-| Gitar review workflow | Five rules, review documents, criteria and PR template prepared | Owned repository/App, actual reviewed PRs and responses; no review count fabricated |
-| Radar deployment/Checks/investigations | Starter manifests with optional app credentials; exact-version/deps smoke tooling | Owned cluster/repo, rollout/image/revision proof, real Checks and investigations; no guessed HPA sizing |
+| Gitar review workflow | Five rules, review documents, criteria and PR template prepared | App authorization on the created owned repository, actual reviewed PRs and responses; no review count fabricated |
+| Radar deployment/Checks/investigations | Starter manifests with optional app credentials; exact-version/deps smoke tooling | Owned repository created; cluster authentication, rollout/image/revision proof, real Checks and investigations; no guessed HPA sizing |
 | Design and QA | User palette; responsive Apple-inspired hierarchy; Playwright, axe and agent-operated visual review | Browser-on-real-ES stopped by host memory pressure; human assistive-technology acceptance and physical-device check |
 | Docs, demo and submission | README/DEMO/STORY, decisions, lessons, human log and bounded QA evidence | Real cloud links/QR, human-recorded video and submission; no fabricated user actions |
 

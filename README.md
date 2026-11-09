@@ -82,7 +82,7 @@ See [observability](observability/README.md) for OTel and Dash0 setup. A real lo
 
 [Operator commands](docs/operations.md) provide exact-version smoke checks, protected dependency verification and the explicit ranking-mode CLI. [Gitar setup](docs/gitar-setup.md) describes the prepared review rules and account connection still needed.
 
-The original Kubernetes/Argo CD starter is retained. Team/repository placeholders are intentionally unresolved until an actual owned destination is supplied. Never push to `upstream` (the public template). The requested `overflow-cnh/overflow` was not accessible during this build, and Radar/Dash0 tools were not connected. No cluster or cloud-account mutation occurred.
+The user authorized and owns [anurupkumar18/OverFlow](https://github.com/anurupkumar18/OverFlow). Deployment files target team slug `overflow`, namespace `team-overflow`, and the intended URL `https://overflow.cnh.radarhq.io`. These are configured targets, not proof that a cluster or deployment exists. Never push to `upstream` (the public template). Radar authentication, team invitation and provider setup remain pending; no cluster mutation has occurred.
 
 ## Accessibility
 
