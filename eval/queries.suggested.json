@@ -1,5 +1,5 @@
 {
-  "status": "agent-drafted suggestions, not participant approved; not used by pool.py",
+  "status": "agent-drafted suggestions approved unchanged by the participant on 2026-11-09 (America/Denver); active copy in queries.json is used by pool.py",
   "queries": [
     {"id":"q01","text":"Reduce Kubernetes infrastructure costs without hurting reliability"},
     {"id":"q02","text":"OpenTelemetry tracing in a production system"},

@@ -1,17 +1,16 @@
 # Retrieval evaluation
 
-No queries have been approved and no participant labels were supplied. `queries.json` is empty. `queries.suggested.json` contains **20 agent-drafted suggestions**, excluded from evaluation until the participant explicitly selects or supplies queries. `results.md` truthfully reports n=0 and not measured. No baseline or ranking winner is fabricated.
+On November 9, 2026 (America/Denver), the participant explicitly approved all **20 agent-drafted suggestions**, unchanged, in this chat. `queries.json` now contains those exact IDs and texts; `queries.suggested.json` retains their origin. This is query approval only: no provider runs, relevance judgments or measured baseline have been supplied. `results.md` truthfully reports n=0 and not measured. See the approval record in `docs/human-log.md`.
 
 All commands run from repository root with Python 3.11+ and no third-party packages:
 
 ```sh
 python3 -m unittest discover -s scripts/tests -v
-python3 eval/pool.py
 python3 eval/run.py
 python3 eval/gate.py
 ```
 
-After participant approval, `eval/queries.json` uses `[{"id":"q01","text":"participant-approved exact query"}]`. Preserve the participant's wording. Collect real rankings with:
+`eval/queries.json` uses `[{"id":"q01","text":"participant-approved exact query"}]`. Preserve the approved wording. The 20 queries are ready for collection; a provider connection is required. Collect real rankings with:
 
 ```sh
 python3 eval/pool.py --env /absolute/private/overflow.env

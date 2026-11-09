@@ -76,7 +76,7 @@ npm run build:browser --prefix app
 node --env-file=/absolute/path/to/private.env --require ./app/telemetry.cjs app/server.js
 ```
 
-Elasticsearch requires an actual endpoint, scoped API key and populated indices. Ingestion must pin an inference endpoint that exists in the target account; no endpoint is assumed from a tutorial. The evaluation tooling starts with no approved queries and no human labels; no ranking results are fabricated. See [evaluation](eval/README.md). An isolated Elasticsearch 9.5.6 run indexed all 470 talks and passed 12 API scenarios; [the report](docs/local-elasticsearch-qa.md) distinguishes lexical/ES|QL evidence from unverified inference and remote deployment.
+Elasticsearch requires an actual endpoint, scoped API key and populated indices. Ingestion must pin an inference endpoint that exists in the target account; no endpoint is assumed from a tutorial. The participant approved all 20 suggested evaluation queries on November 9, 2026; real provider runs and human relevance labels remain pending. See [evaluation](eval/README.md). An isolated Elasticsearch 9.5.6 run indexed all 470 talks and passed 12 API scenarios; [the report](docs/local-elasticsearch-qa.md) distinguishes lexical/ES|QL evidence from unverified inference and remote deployment.
 
 See [observability](observability/README.md) for OTel and Dash0 setup. A real local collector received server traces/logs/metrics and browser Web Vitals, sanitized errors and events, with linked browser/backend spans. This proves local exports, not Dash0 account ingestion. Browser telemetry stays disabled unless dedicated browser ingest configuration is explicitly enabled. Queries, attendee IDs and raw error messages are excluded from its payloads.
 
@@ -90,7 +90,7 @@ Semantic landmarks, labeled inputs, native dialogs, keyboard focus, status annou
 
 ## Evaluation and judging evidence
 
-The initial evaluation state is **not measured, n=0**. Suggested queries are agent-drafted and kept separate from approved queries. Human labels are required before reporting Recall@10, MRR or a winning search arm. Pooled recall is relative to the judged pool, not complete-corpus recall.
+The evaluation state is **20 approved queries; not measured, n=0**. The agent-drafted queries were explicitly approved unchanged by the participant. Human labels are required before reporting Recall@10, MRR or a winning search arm. Pooled recall is relative to the judged pool, not complete-corpus recall.
 
 Ranking-related PRs run a required fresh-provider evaluation job. Missing provider access, human labels or an approved comparable baseline produces a failing `not_evaluated` result; saved scores cannot substitute for fresh runs. The actual indexed corpus must match the proposed catalog. The current build has no approved labels/baseline, so this release gate is not satisfied.
 
